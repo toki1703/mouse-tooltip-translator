@@ -1020,6 +1020,15 @@ class PageTranslator {
     this._cancelled = true;
     this._running = false;
     this._hideProgress();
+    // Revert any blocks that were translated before cancellation
+    const container = this._getContainer();
+    if (container) {
+      container.querySelectorAll('[data-mtt-orig]').forEach(el => {
+        el.innerHTML = el.getAttribute('data-mtt-orig');
+        el.removeAttribute('data-mtt-orig');
+        el.classList.remove('mtt-page-translated');
+      });
+    }
     this._syncButton(this.plugin.app.workspace.activeLeaf?.view);
   }
 
@@ -1132,7 +1141,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
     this.addRibbonIcon('book-open', '単語帳を開く', () => this.openVocabView());
     this.addRibbonIcon('languages', 'ページを翻訳 / 元に戻す', () => {
-      if (this.pageTranslator.hasTranslation()) {
+      if (this.pageTranslator._running) {
+        this.pageTranslator.cancel();
+      } else if (this.pageTranslator.hasTranslation()) {
         this.pageTranslator.restorePage();
       } else {
         this.pageTranslator.translatePage();
@@ -1221,7 +1232,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (!view || typeof view.addAction !== 'function') return;
     if (view.containerEl?.querySelector('.mtt-page-btn')) return;
     const btn = view.addAction('languages', 'ページを翻訳 / 元に戻す', () => {
-      if (this.pageTranslator.hasTranslation()) {
+      if (this.pageTranslator._running) {
+        this.pageTranslator.cancel();
+      } else if (this.pageTranslator.hasTranslation()) {
         this.pageTranslator.restorePage();
       } else {
         this.pageTranslator.translatePage();
