@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "entries": {
+    "v2|google|auto|ja|I sat across from you, the plush velvet of the chair a stark contrast to t": {
+      "sourceText": "I sat across from you, the plush velvet of the chair a stark contrast to t",
+      "targetText": "私はあなたの向かいに座っていました、その豪華なベルベットの椅子はあなたの椅子とはまったく対照的でした",
+      "sourceLang": "en",
+      "targetLang": "ja",
+      "count": 1,
+      "firstSeen": 1778788988077,
+      "lastSeen": 1778788988077
+    },
+    "v2|google|auto|ja|simple": {
+      "sourceText": "simple",
+      "targetText": "単純",
+      "sourceLang": "en",
+      "targetLang": "ja",
+      "count": 1,
+      "firstSeen": 1778789060533,
+      "lastSeen": 1778789060533
+    },
+    "v2|google|auto|ja|the": {
+      "sourceText": "the",
+      "targetText": "の",
+      "sourceLang": "en",
+      "targetLang": "ja",
+      "count": 1,
+      "firstSeen": 1778789062912,
+      "lastSeen": 1778789062912
+    }
+  }
+}

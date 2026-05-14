@@ -510,15 +510,23 @@ class TranslationLog {
 
   record(key, result, sourceText) {
     const now = Date.now();
+    const hasDict = Array.isArray(result.dict) && result.dict.length > 0;
     if (this.entries[key]) {
       this.entries[key].count++;
       this.entries[key].lastSeen = now;
+      // Backfill pos/type if the first hit lacked dict data but this one has it.
+      if (hasDict && this.entries[key].pos.length === 0) {
+        this.entries[key].pos = result.dict;
+        this.entries[key].type = 'word';
+      }
     } else {
       this.entries[key] = {
         sourceText,
         targetText: result.targetText,
         sourceLang: result.sourceLang,
         targetLang: result.targetLang,
+        pos: hasDict ? result.dict : [],
+        type: hasDict ? 'word' : 'sentence',
         count: 1,
         firstSeen: now,
         lastSeen: now,
