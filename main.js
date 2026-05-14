@@ -842,16 +842,26 @@ class PageTranslator {
     this._progressEl = null;
   }
 
-  // Returns the .markdown-rendered container for the active reading-view leaf,
-  // or null when not in reading mode.
-  _getContainer() {
-    const leaf = this.plugin.app.workspace.activeLeaf;
-    const view = leaf?.view;
+  _getViewContainer(view) {
     if (!view) return null;
     if (view.getMode?.() !== 'preview') return null;
     const previewEl = view.previewMode?.containerEl;
     if (!previewEl) return null;
     return previewEl.querySelector('.markdown-rendered') ?? previewEl;
+  }
+
+  // Returns the .markdown-rendered container for the active reading-view leaf,
+  // or null when not in reading mode.
+  _getContainer() {
+    return this._getViewContainer(this.plugin.app.workspace.activeLeaf?.view);
+  }
+
+  // Reflects the current translation state on the header button of a given view.
+  _syncButton(view) {
+    const btn = view?.containerEl?.querySelector('.mtt-page-btn');
+    if (!btn) return;
+    const active = !!(this._getViewContainer(view)?.querySelector('[data-mtt-orig]'));
+    btn.classList.toggle('is-active', active);
   }
 
   // Returns leaf-level translatable block elements (headings, paragraphs, list
@@ -880,11 +890,27 @@ class PageTranslator {
       el.querySelector('.mtt-page-progress-cancel').onclick = () => this.cancel();
       document.body.appendChild(el);
       this._progressEl = el;
+      this._repositionProgress();
     }
     const pct = total > 0 ? Math.round(current / total * 100) : 0;
     this._progressEl.querySelector('.mtt-page-progress-label').textContent =
       `ページ翻訳中... ${current}/${total}`;
     this._progressEl.querySelector('.mtt-page-progress-bar').style.width = `${pct}%`;
+  }
+
+  _repositionProgress() {
+    if (!this._progressEl) return;
+    const view = this.plugin.app.workspace.activeLeaf?.view;
+    const headerEl = view?.containerEl?.querySelector('.view-header');
+    if (headerEl) {
+      const rect = headerEl.getBoundingClientRect();
+      Object.assign(this._progressEl.style, {
+        top: `${rect.bottom + 4}px`,
+        left: `${rect.left + 8}px`,
+        bottom: 'auto',
+        transform: 'none',
+      });
+    }
   }
 
   _hideProgress() {
@@ -895,6 +921,7 @@ class PageTranslator {
     this._cancelled = true;
     this._running = false;
     this._hideProgress();
+    this._syncButton(this.plugin.app.workspace.activeLeaf?.view);
   }
 
   hasTranslation() {
@@ -953,6 +980,9 @@ class PageTranslator {
     this._hideProgress();
     this._running = false;
 
+    const activeView = this.plugin.app.workspace.activeLeaf?.view;
+    this._syncButton(activeView);
+
     if (!this._cancelled) {
       new Notice(`ページ翻訳完了 (${done}/${blocks.length} セクション)`);
     }
@@ -974,6 +1004,7 @@ class PageTranslator {
       el.removeAttribute('data-mtt-orig');
       el.classList.remove('mtt-page-translated');
     });
+    this._syncButton(this.plugin.app.workspace.activeLeaf?.view);
     new Notice(`元のテキストに復元しました (${translated.length} セクション)`);
   }
 }
@@ -1040,6 +1071,15 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       callback: () => this.pageTranslator.restorePage(),
     });
 
+    // Add translate button to all current and future markdown view headers.
+    const addButtons = () => {
+      this.app.workspace.getLeavesOfType('markdown').forEach(leaf => {
+        this._addPageTranslateButton(leaf.view);
+      });
+    };
+    addButtons();
+    this.registerEvent(this.app.workspace.on('layout-change', addButtons));
+
     this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
     this.registerDomEvent(document, 'mouseleave', () => {
       // keep tooltip while a selection is locking it
@@ -1071,6 +1111,19 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (this.pageTranslator?._running) this.pageTranslator.cancel();
     if (this.tooltip) await this.tooltip.destroy();
     this.app.workspace.detachLeavesOfType(VOCAB_VIEW_TYPE);
+  }
+
+  _addPageTranslateButton(view) {
+    if (!view || view.containerEl.querySelector('.mtt-page-btn')) return;
+    const btn = view.addAction('languages', 'ページを翻訳 / 元に戻す', () => {
+      if (this.pageTranslator.hasTranslation()) {
+        this.pageTranslator.restorePage();
+      } else {
+        this.pageTranslator.translatePage();
+      }
+    });
+    btn.classList.add('mtt-page-btn');
+    this.pageTranslator._syncButton(view);
   }
 
   async openVocabView() {

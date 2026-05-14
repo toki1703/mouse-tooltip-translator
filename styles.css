@@ -211,6 +211,7 @@
 /* ── Page Translation ────────────────────────────────────────── */
 .mtt-page-progress {
   position: fixed;
+  /* default fallback position — overridden by JS to sit below the view header */
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
@@ -265,4 +266,8 @@
 .mtt-page-progress-cancel:hover {
   color: var(--text-normal);
   background: var(--background-modifier-hover);
+}
+
+.mtt-page-btn.is-active {
+  color: var(--interactive-accent) !important;
 }
