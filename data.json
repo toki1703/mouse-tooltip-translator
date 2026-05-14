@@ -1,0 +1,13 @@
+{
+  "engine": "google",
+  "sourceLang": "auto",
+  "targetLang": "ja",
+  "triggerMode": "mouseoverselect",
+  "textType": "word",
+  "delayMs": 500,
+  "showSourceText": false,
+  "showDetectedLang": false,
+  "showDictionary": true,
+  "showTransliteration": false,
+  "enabled": true
+}
