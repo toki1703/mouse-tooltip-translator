@@ -1,7 +1,7 @@
 {
 	"id": "mouse-tooltip-translator",
 	"name": "Mouse Tooltip Translator for Obsidian",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"minAppVersion": "0.15.0",
 	"description": "Inspired by 'Mouse Tooltip Translator' Chrome extension. Hover to translate.",
 	"author": "ときくん",
