@@ -16,6 +16,11 @@ const DEFAULT_SETTINGS = {
   // When true, only react inside Obsidian note content (editor / preview / rendered embeds).
   // When false, react across the entire UI (sidebars, headers, etc.) — original behavior.
   restrictToNoteContent: true,
+  // Suppress the tooltip when detected source language equals the target language.
+  skipSameLanguage: true,
+  // Stricter fallback: suppress when the translated text is identical to the input.
+  // Helps when language detection is wrong (e.g. short tokens, proper nouns).
+  skipIdenticalText: false,
 };
 
 // Selector for nodes that count as "note content".
@@ -29,6 +34,22 @@ function isInNoteContent(node) {
   const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
   if (!el) return false;
   return !!el.closest(NOTE_CONTENT_SELECTOR);
+}
+
+// A "no-op translation" is one we don't want to display. Each check is gated
+// by its own user setting so the behavior can be tuned:
+//   - skipSameLanguage : detected source language equals target language.
+//   - skipIdenticalText: translated text is identical to the source text
+//                        (catches mis-detected language codes for proper nouns,
+//                         codes, single tokens that the API echoed back, etc.).
+function isNoopTranslation(result, text, opts) {
+  if (!result || !result.targetText) return false;
+  const { skipSameLanguage = true, skipIdenticalText = false } = opts || {};
+  if (skipSameLanguage
+      && result.sourceLang && result.targetLang
+      && result.sourceLang === result.targetLang) return true;
+  if (skipIdenticalText && result.targetText.trim() === (text || '').trim()) return true;
+  return false;
 }
 
 const COMMON_LANGS = {
@@ -504,16 +525,29 @@ class TooltipManager {
       this.position(rect);
       return;
     }
+
+    // Short-circuit when source/target are explicitly the same — no API call needed.
+    if (sourceLang !== 'auto' && sourceLang === targetLang) {
+      this.hide();
+      return;
+    }
+
+    const key = `v2|${engine}|${sourceLang}|${targetLang}|${text}`;
+    const cached = this.cacheGet(key);
+    // Sync no-op check on cache hit — avoids flashing the "…" loading state.
+    if (cached && isNoopTranslation(cached, text, this.plugin.settings)) {
+      this.hide();
+      return;
+    }
+
     this.lastText = text;
     const my = ++this.token;
 
     const el = this.ensure();
-    el.textContent = '…';
-    el.style.display = 'block';
+    el.style.display = 'none';
     this.position(rect);
 
-    const key = `v2|${engine}|${sourceLang}|${targetLang}|${text}`;
-    let result = this.cacheGet(key);
+    let result = cached;
     if (!result) {
       try {
         const eng = ENGINES[engine] || ENGINES.google;
@@ -533,8 +567,9 @@ class TooltipManager {
       this.position(rect);
       return;
     }
-    if (sourceLang !== 'auto' && result.sourceLang === targetLang && targetLang === sourceLang) {
-      // skip identical translations would normally happen here; pass
+    if (isNoopTranslation(result, text, this.plugin.settings)) {
+      this.hide();
+      return;
     }
     el.empty ? el.empty() : (el.textContent = '');
 
@@ -867,5 +902,27 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .addToggle((t) => t
         .setValue(this.plugin.settings.showDetectedLang)
         .onChange(async (v) => { this.plugin.settings.showDetectedLang = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName('Skip same-language translations')
+      .setDesc('Hide the tooltip when the detected source language matches the target language (e.g. Japanese → Japanese). Relies on the engine\'s language detection.')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.skipSameLanguage)
+        .onChange(async (v) => {
+          this.plugin.settings.skipSameLanguage = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
+
+    new Setting(containerEl)
+      .setName('Skip identical translations (strict)')
+      .setDesc('Also hide the tooltip when the translated text is identical to the source text. Useful when language detection is wrong on short tokens, proper nouns, or code.')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.skipIdenticalText)
+        .onChange(async (v) => {
+          this.plugin.settings.skipIdenticalText = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
   }
 }
