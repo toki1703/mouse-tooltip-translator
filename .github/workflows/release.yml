@@ -17,11 +17,13 @@ jobs:
 
       # package.jsonがないため、npm install関連のステップは削除します
 
-      # 🌟 main.js のビルド証明（Artifact Attestation）を生成
+      # 🌟 main.js と styles.css の両方にビルド証明を生成
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-path: 'main.js'
+          subject-path: |
+            main.js
+            styles.css
 
       # GitHub CLIを使ってリリースを作成し、アセットをアップロード
       - name: Create release
