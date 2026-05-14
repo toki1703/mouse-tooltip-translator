@@ -21,6 +21,16 @@ const DEFAULT_SETTINGS = {
   // Stricter fallback: suppress when the translated text is identical to the input.
   // Helps when language detection is wrong (e.g. short tokens, proper nouns).
   skipIdenticalText: false,
+  // When true, always call the translation API and never read from in-memory cache.
+  disableCache: false,
+  // LLM engine settings
+  openaiCompatApiUrl: 'https://api.openai.com',
+  openaiCompatApiKey: '',
+  openaiCompatModel: 'gpt-4o-mini',
+  ollamaApiUrl: 'http://localhost:11434',
+  ollamaModel: '',
+  lmstudioApiUrl: 'http://localhost:1234',
+  lmstudioModel: '',
 };
 
 // Selector for nodes that count as "note content".
@@ -123,11 +133,11 @@ class BaseTranslator {
     }
     return Object.prototype.hasOwnProperty.call(this._swap, c) ? this._swap[c] : c;
   }
-  static async translate(text, src, tgt) {
+  static async translate(text, src, tgt, settings) {
     try {
       const esrc = this.encodeLang(src || 'auto');
       const etgt = this.encodeLang(tgt);
-      const raw = await this.requestTranslate(text, esrc, etgt);
+      const raw = await this.requestTranslate(text, esrc, etgt, settings);
       const wrapped = await this.wrapResponse(raw, text, esrc, etgt);
       if (!wrapped || wrapped.targetText == null) return null;
       return {
@@ -406,6 +416,69 @@ class PapagoEngine extends BaseTranslator {
   }
 }
 
+// ---- LLM engines (OpenAI-compatible chat completions) ----
+class LLMEngine extends BaseTranslator {
+  static langCodeJson = {};
+
+  static _buildPrompt(text, tgt) {
+    const tgtName = COMMON_LANGS[tgt] || tgt;
+    return `Translate the following text to ${tgtName}. Output only the translated text, nothing else.\n\n${text}`;
+  }
+
+  static async _chatRequest(text, etgt, { url, model, apiKey }) {
+    if (!model) throw new Error('モデル名が未設定です。設定から入力してください。');
+    const endpoint = `${(url || '').replace(/\/+$/, '')}/v1/chat/completions`;
+    const headers = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    return http('POST', endpoint, {
+      headers,
+      body: {
+        model,
+        messages: [{ role: 'user', content: this._buildPrompt(text, etgt) }],
+        temperature: 0,
+      },
+    });
+  }
+
+  static async requestTranslate() { throw new Error('not implemented'); }
+
+  static async wrapResponse(raw) {
+    const content = raw?.json?.choices?.[0]?.message?.content?.trim();
+    if (!content) return null;
+    return { targetText: content };
+  }
+}
+
+class OpenAICompatEngine extends LLMEngine {
+  static async requestTranslate(text, _esrc, etgt, settings) {
+    return this._chatRequest(text, etgt, {
+      url: settings?.openaiCompatApiUrl || 'https://api.openai.com',
+      model: settings?.openaiCompatModel || 'gpt-4o-mini',
+      apiKey: settings?.openaiCompatApiKey || '',
+    });
+  }
+}
+
+class OllamaEngine extends LLMEngine {
+  static async requestTranslate(text, _esrc, etgt, settings) {
+    return this._chatRequest(text, etgt, {
+      url: settings?.ollamaApiUrl || 'http://localhost:11434',
+      model: settings?.ollamaModel || '',
+      apiKey: '',
+    });
+  }
+}
+
+class LMStudioEngine extends LLMEngine {
+  static async requestTranslate(text, _esrc, etgt, settings) {
+    return this._chatRequest(text, etgt, {
+      url: settings?.lmstudioApiUrl || 'http://localhost:1234',
+      model: settings?.lmstudioModel || '',
+      apiKey: 'lm-studio',
+    });
+  }
+}
+
 const ENGINE_CLASSES = {
   google: GoogleEngine,
   googleGTX: GoogleGTXEngine,
@@ -413,6 +486,9 @@ const ENGINE_CLASSES = {
   bing: BingEngine,
   yandex: YandexEngine,
   papago: PapagoEngine,
+  openaiCompat: OpenAICompatEngine,
+  ollama: OllamaEngine,
+  lmstudio: LMStudioEngine,
 };
 
 const ENGINE_LABELS = {
@@ -422,14 +498,19 @@ const ENGINE_LABELS = {
   bing: 'Bing (experimental)',
   yandex: 'Yandex (experimental)',
   papago: 'Papago (experimental)',
+  openaiCompat: 'OpenAI互換API',
+  ollama: 'Ollama (ローカル)',
+  lmstudio: 'LM Studio (ローカル)',
 };
+
+const LLM_ENGINE_KEYS = new Set(['openaiCompat', 'ollama', 'lmstudio']);
 
 const ENGINES = Object.fromEntries(
   Object.entries(ENGINE_CLASSES).map(([k, C]) => [
     k,
     {
       label: ENGINE_LABELS[k] || k,
-      translate: (text, src, tgt) => C.translate(text, src, tgt),
+      translate: (text, src, tgt, settings) => C.translate(text, src, tgt, settings),
     },
   ])
 );
@@ -615,7 +696,8 @@ class TooltipManager {
     }
 
     const key = `v2|${engine}|${sourceLang}|${targetLang}|${text}`;
-    const cached = this.cacheGet(key);
+    const skipCache = this.plugin.settings.disableCache;
+    const cached = skipCache ? null : this.cacheGet(key);
     // Sync no-op check on cache hit — avoids flashing the "…" loading state.
     if (cached && isNoopTranslation(cached, text, this.plugin.settings)) {
       this.hide();
@@ -633,7 +715,7 @@ class TooltipManager {
     if (!result) {
       try {
         const eng = ENGINES[engine] || ENGINES.google;
-        result = await eng.translate(text, sourceLang, targetLang);
+        result = await eng.translate(text, sourceLang, targetLang, this.plugin.settings);
       } catch (e) {
         if (my === this.token) {
           el.textContent = `⚠ ${e.message || e}`;
@@ -960,7 +1042,7 @@ class PageTranslator {
       if (!originalText) { done++; continue; }
 
       try {
-        const result = await eng.translate(originalText, sourceLang, targetLang);
+        const result = await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
         if (this._cancelled) break;
         if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
           el.setAttribute('data-mtt-orig', el.innerHTML);
@@ -1114,7 +1196,8 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   }
 
   _addPageTranslateButton(view) {
-    if (!view || view.containerEl.querySelector('.mtt-page-btn')) return;
+    if (!view || typeof view.addAction !== 'function') return;
+    if (view.containerEl?.querySelector('.mtt-page-btn')) return;
     const btn = view.addAction('languages', 'ページを翻訳 / 元に戻す', () => {
       if (this.pageTranslator.hasTranslation()) {
         this.pageTranslator.restorePage();
@@ -1254,8 +1337,57 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .addDropdown((d) => {
         for (const [k, v] of Object.entries(ENGINES)) d.addOption(k, v.label);
         d.setValue(this.plugin.settings.engine)
-          .onChange(async (v) => { this.plugin.settings.engine = v; await this.plugin.saveSettings(); });
+          .onChange(async (v) => {
+            this.plugin.settings.engine = v;
+            await this.plugin.saveSettings();
+            this.display();
+          });
       });
+
+    // ---- LLM engine settings (shown only for LLM engines) ----
+    const eng = this.plugin.settings.engine;
+    if (LLM_ENGINE_KEYS.has(eng)) {
+      containerEl.createEl('h3', { text: eng === 'openaiCompat' ? 'OpenAI互換API設定'
+        : eng === 'ollama' ? 'Ollama設定' : 'LM Studio設定' });
+
+      new Setting(containerEl)
+        .setName('API URL')
+        .setDesc(eng === 'openaiCompat'
+          ? 'ベースURL（例: https://api.openai.com）'
+          : eng === 'ollama'
+            ? 'OllamaのベースURL（デフォルト: http://localhost:11434）'
+            : 'LM StudioのベースURL（デフォルト: http://localhost:1234）')
+        .addText((t) => {
+          const key = eng === 'openaiCompat' ? 'openaiCompatApiUrl'
+            : eng === 'ollama' ? 'ollamaApiUrl' : 'lmstudioApiUrl';
+          t.setPlaceholder(eng === 'openaiCompat' ? 'https://api.openai.com'
+            : eng === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234')
+            .setValue(this.plugin.settings[key] || '')
+            .onChange(async (v) => { this.plugin.settings[key] = v.trim(); await this.plugin.saveSettings(); });
+        });
+
+      if (eng === 'openaiCompat') {
+        new Setting(containerEl)
+          .setName('API Key')
+          .addText((t) => t
+            .setPlaceholder('sk-...')
+            .setValue(this.plugin.settings.openaiCompatApiKey || '')
+            .onChange(async (v) => { this.plugin.settings.openaiCompatApiKey = v.trim(); await this.plugin.saveSettings(); }));
+      }
+
+      new Setting(containerEl)
+        .setName('Model')
+        .setDesc(eng === 'openaiCompat' ? '例: gpt-4o-mini, gpt-4o'
+          : eng === 'ollama' ? '例: llama3, mistral, gemma3'
+          : '例: llama-3.2-3b-instruct')
+        .addText((t) => {
+          const key = eng === 'openaiCompat' ? 'openaiCompatModel'
+            : eng === 'ollama' ? 'ollamaModel' : 'lmstudioModel';
+          t.setPlaceholder(eng === 'openaiCompat' ? 'gpt-4o-mini' : '')
+            .setValue(this.plugin.settings[key] || '')
+            .onChange(async (v) => { this.plugin.settings[key] = v.trim(); await this.plugin.saveSettings(); });
+        });
+    }
 
     new Setting(containerEl)
       .setName('Translate from')
@@ -1352,6 +1484,17 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         .setValue(this.plugin.settings.skipIdenticalText)
         .onChange(async (v) => {
           this.plugin.settings.skipIdenticalText = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
+
+    new Setting(containerEl)
+      .setName('Disable translation cache')
+      .setDesc('Always call the translation API on every hover, ignoring the in-memory cache. Useful when you want fresh results each time.')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.disableCache)
+        .onChange(async (v) => {
+          this.plugin.settings.disableCache = v;
           await this.plugin.saveSettings();
           this.plugin.tooltip.hide();
         }));
