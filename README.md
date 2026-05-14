@@ -1,11 +1,11 @@
-# Mouse Tooltip Translator for Obsidian
+# Mouse Tooltip Translator
 
 > **"Read effortlessly, learn instantly."**
 > Obsidianでの読書と学習を、マウスホバーだけで完結させる翻訳プラグイン。
 
 <div align="center">
 <a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/" style="text-decoration: none">
-<img alt="Mouse Tooltip Translator for Obsidian downloads - latest release" src="https://img.shields.io/badge/dynamic/json?query=%24%5B%22obsidian-mouse-tooltip-translator%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json&label=Downloads:&logo=obsidian&color=8c79de&logoColor=8c79de">
+<img alt="Mouse Tooltip Translator downloads - latest release" src="https://img.shields.io/badge/dynamic/json?query=%24%5B%22obsidian-mouse-tooltip-translator%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json&label=Downloads:&logo=obsidian&color=8c79de&logoColor=8c79de">
 </a>
 <a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/stargazers" style="text-decoration: none">
 <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/toki1703/obsidian-mouse-tooltip-translator?color=yellow&label=Stargazers%3A&logo=OpenTelemetry&logoColor=yellow">
@@ -167,7 +167,7 @@ Obsidianの設定 → Community plugins → Browse で `Mouse Tooltip Translator
    ```
 
 3. Obsidianを再起動またはプラグインをリロード
-4. Community plugins から `Mouse Tooltip Translator for Obsidian` を有効化
+4. Community plugins から `Mouse Tooltip Translator` を有効化
 
 ---
 
