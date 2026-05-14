@@ -2,7 +2,9 @@ const { Plugin, PluginSettingTab, Setting, Notice, requestUrl, ItemView } = requ
 const nodeCrypto = require('crypto');
 
 const DEFAULT_SETTINGS = {
-  engine: 'google',
+  mouseoverEngine: 'google',
+  selectionEngine: 'google',
+  pageEngine: 'google',
   sourceLang: 'auto',
   targetLang: 'ja',
   triggerMode: 'mouseoverselect', // 'mouseover' | 'select' | 'mouseoverselect'
@@ -27,10 +29,16 @@ const DEFAULT_SETTINGS = {
   openaiCompatApiUrl: 'https://api.openai.com',
   openaiCompatApiKey: '',
   openaiCompatModel: 'gpt-4o-mini',
+  openaiCompatPrompt: '',
+  openaiCompatTemperature: 0,
   ollamaApiUrl: 'http://localhost:11434',
   ollamaModel: '',
+  ollamaPrompt: '',
+  ollamaTemperature: 0,
   lmstudioApiUrl: 'http://localhost:1234',
   lmstudioModel: '',
+  lmstudioPrompt: '',
+  lmstudioTemperature: 0,
 };
 
 // Selector for nodes that count as "note content".
@@ -420,12 +428,15 @@ class PapagoEngine extends BaseTranslator {
 class LLMEngine extends BaseTranslator {
   static langCodeJson = {};
 
-  static _buildPrompt(text, tgt) {
+  static _buildPrompt(text, tgt, template) {
     const tgtName = COMMON_LANGS[tgt] || tgt;
+    if (template && template.trim()) {
+      return template.replace(/\{\{text\}\}/g, text).replace(/\{\{targetLang\}\}/g, tgtName);
+    }
     return `Translate the following text to ${tgtName}. Output only the translated text, nothing else.\n\n${text}`;
   }
 
-  static async _chatRequest(text, etgt, { url, model, apiKey }) {
+  static async _chatRequest(text, etgt, { url, model, apiKey, prompt }) {
     if (!model) throw new Error('モデル名が未設定です。設定から入力してください。');
     const endpoint = `${(url || '').replace(/\/+$/, '')}/v1/chat/completions`;
     const headers = { 'Content-Type': 'application/json' };
@@ -434,7 +445,7 @@ class LLMEngine extends BaseTranslator {
       headers,
       body: {
         model,
-        messages: [{ role: 'user', content: this._buildPrompt(text, etgt) }],
+        messages: [{ role: 'user', content: this._buildPrompt(text, etgt, prompt) }],
         temperature: 0,
       },
     });
@@ -455,6 +466,7 @@ class OpenAICompatEngine extends LLMEngine {
       url: settings?.openaiCompatApiUrl || 'https://api.openai.com',
       model: settings?.openaiCompatModel || 'gpt-4o-mini',
       apiKey: settings?.openaiCompatApiKey || '',
+      prompt: settings?.openaiCompatPrompt || '',
     });
   }
 }
@@ -465,6 +477,7 @@ class OllamaEngine extends LLMEngine {
       url: settings?.ollamaApiUrl || 'http://localhost:11434',
       model: settings?.ollamaModel || '',
       apiKey: '',
+      prompt: settings?.ollamaPrompt || '',
     });
   }
 }
@@ -475,6 +488,7 @@ class LMStudioEngine extends LLMEngine {
       url: settings?.lmstudioApiUrl || 'http://localhost:1234',
       model: settings?.lmstudioModel || '',
       apiKey: 'lm-studio',
+      prompt: settings?.lmstudioPrompt || '',
     });
   }
 }
@@ -681,9 +695,10 @@ class TooltipManager {
         .forEach(l => { if (l.view && l.view.refresh) l.view.refresh(); });
     }
   }
-  async show(text, rect) {
+  async show(text, rect, engineKey) {
     if (!text) return;
-    const { engine, sourceLang, targetLang } = this.plugin.settings;
+    const { sourceLang, targetLang } = this.plugin.settings;
+    const engine = engineKey || 'google';
     if (text === this.lastText && this.el && this.el.style.display !== 'none') {
       this.position(rect);
       return;
@@ -1029,7 +1044,8 @@ class PageTranslator {
     this._running = true;
     this._cancelled = false;
 
-    const { engine, sourceLang, targetLang, disableCache } = this.plugin.settings;
+    const { pageEngine, sourceLang, targetLang, disableCache } = this.plugin.settings;
+    const engine = pageEngine || 'google';
     const eng = ENGINES[engine] || ENGINES.google;
     const tooltip = this.plugin.tooltip;
 
@@ -1247,7 +1263,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       if (this.selectionActive) return;
       const hit = extractAtPoint(x, y, this.settings.textType);
       if (!hit) { this.tooltip.hide(); return; }
-      this.tooltip.show(hit.text, hit.rect);
+      this.tooltip.show(hit.text, hit.rect, this.settings.mouseoverEngine);
     }, Math.max(0, this.settings.delayMs | 0));
   }
 
@@ -1296,11 +1312,18 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       rect = sel.getRangeAt(0).getBoundingClientRect();
     } catch { rect = null; }
     if (!rect) return;
-    this.tooltip.show(text, rect);
+    this.tooltip.show(text, rect, this.settings.selectionEngine);
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+    // Migrate old single 'engine' setting to per-context engines
+    if (loaded?.engine) {
+      if (!loaded.mouseoverEngine) this.settings.mouseoverEngine = loaded.engine;
+      if (!loaded.selectionEngine) this.settings.selectionEngine = loaded.engine;
+      if (!loaded.pageEngine) this.settings.pageEngine = loaded.engine;
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -1335,21 +1358,35 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.tooltip.hide();
         }));
 
-    new Setting(containerEl)
-      .setName('Translator engine')
-      .addDropdown((d) => {
-        for (const [k, v] of Object.entries(ENGINES)) d.addOption(k, v.label);
-        d.setValue(this.plugin.settings.engine)
-          .onChange(async (v) => {
-            this.plugin.settings.engine = v;
-            await this.plugin.saveSettings();
-            this.display();
-          });
-      });
+    // ---- Per-context engine selection ----
+    containerEl.createEl('h3', { text: 'エンジン設定' });
 
-    // ---- LLM engine settings (shown only for LLM engines) ----
-    const eng = this.plugin.settings.engine;
-    if (LLM_ENGINE_KEYS.has(eng)) {
+    const engineConfigs = [
+      { key: 'mouseoverEngine', name: 'ホバー翻訳エンジン', desc: 'マウスカーソルを合わせたときに使うエンジン' },
+      { key: 'selectionEngine', name: 'テキスト選択エンジン', desc: 'テキストを選択したときに使うエンジン' },
+      { key: 'pageEngine',      name: 'ページ翻訳エンジン',   desc: 'ページ全体を翻訳するときに使うエンジン' },
+    ];
+    for (const { key, name, desc } of engineConfigs) {
+      new Setting(containerEl)
+        .setName(name)
+        .setDesc(desc)
+        .addDropdown((d) => {
+          for (const [k, v] of Object.entries(ENGINES)) d.addOption(k, v.label);
+          d.setValue(this.plugin.settings[key] || 'google')
+            .onChange(async (v) => {
+              this.plugin.settings[key] = v;
+              await this.plugin.saveSettings();
+              this.display();
+            });
+        });
+    }
+
+    // ---- LLM engine settings (shown once per unique LLM engine in use) ----
+    const usedLLMs = [...new Set(
+      [this.plugin.settings.mouseoverEngine, this.plugin.settings.selectionEngine, this.plugin.settings.pageEngine]
+        .filter(e => LLM_ENGINE_KEYS.has(e))
+    )];
+    for (const eng of usedLLMs) {
       containerEl.createEl('h3', { text: eng === 'openaiCompat' ? 'OpenAI互換API設定'
         : eng === 'ollama' ? 'Ollama設定' : 'LM Studio設定' });
 
@@ -1361,12 +1398,12 @@ class MouseTooltipSettingTab extends PluginSettingTab {
             ? 'OllamaのベースURL（デフォルト: http://localhost:11434）'
             : 'LM StudioのベースURL（デフォルト: http://localhost:1234）')
         .addText((t) => {
-          const key = eng === 'openaiCompat' ? 'openaiCompatApiUrl'
+          const urlKey = eng === 'openaiCompat' ? 'openaiCompatApiUrl'
             : eng === 'ollama' ? 'ollamaApiUrl' : 'lmstudioApiUrl';
           t.setPlaceholder(eng === 'openaiCompat' ? 'https://api.openai.com'
             : eng === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234')
-            .setValue(this.plugin.settings[key] || '')
-            .onChange(async (v) => { this.plugin.settings[key] = v.trim(); await this.plugin.saveSettings(); });
+            .setValue(this.plugin.settings[urlKey] || '')
+            .onChange(async (v) => { this.plugin.settings[urlKey] = v.trim(); await this.plugin.saveSettings(); });
         });
 
       if (eng === 'openaiCompat') {
@@ -1384,12 +1421,27 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           : eng === 'ollama' ? '例: llama3, mistral, gemma3'
           : '例: llama-3.2-3b-instruct')
         .addText((t) => {
-          const key = eng === 'openaiCompat' ? 'openaiCompatModel'
+          const modelKey = eng === 'openaiCompat' ? 'openaiCompatModel'
             : eng === 'ollama' ? 'ollamaModel' : 'lmstudioModel';
           t.setPlaceholder(eng === 'openaiCompat' ? 'gpt-4o-mini' : '')
-            .setValue(this.plugin.settings[key] || '')
-            .onChange(async (v) => { this.plugin.settings[key] = v.trim(); await this.plugin.saveSettings(); });
+            .setValue(this.plugin.settings[modelKey] || '')
+            .onChange(async (v) => { this.plugin.settings[modelKey] = v.trim(); await this.plugin.saveSettings(); });
         });
+
+      const promptKey = eng === 'openaiCompat' ? 'openaiCompatPrompt'
+        : eng === 'ollama' ? 'ollamaPrompt' : 'lmstudioPrompt';
+      const promptSetting = new Setting(containerEl)
+        .setName('プロンプトテンプレート')
+        .setDesc('空欄の場合はデフォルトのプロンプトを使用。{{text}} に原文、{{targetLang}} に翻訳先言語名が挿入されます。');
+      promptSetting.addTextArea((ta) => {
+        ta.setPlaceholder('Translate the following text to {{targetLang}}. Output only the translated text, nothing else.\n\n{{text}}')
+          .setValue(this.plugin.settings[promptKey] || '')
+          .onChange(async (v) => { this.plugin.settings[promptKey] = v; await this.plugin.saveSettings(); });
+        ta.inputEl.rows = 4;
+        ta.inputEl.style.width = '100%';
+        ta.inputEl.style.fontFamily = 'monospace';
+        ta.inputEl.style.fontSize = '12px';
+      });
     }
 
     new Setting(containerEl)
