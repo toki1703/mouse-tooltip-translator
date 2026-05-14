@@ -555,6 +555,7 @@ class TooltipManager {
       } catch (e) {
         if (my === this.token) {
           el.textContent = `⚠ ${e.message || e}`;
+          el.style.display = 'block';
           this.position(rect);
         }
         return;
@@ -564,6 +565,7 @@ class TooltipManager {
     if (my !== this.token) return;
     if (!result || !result.targetText) {
       el.textContent = '(no translation)';
+      el.style.display = 'block';
       this.position(rect);
       return;
     }
@@ -621,6 +623,7 @@ class TooltipManager {
       meta.textContent = `${result.sourceLang} → ${result.targetLang}`;
       el.appendChild(meta);
     }
+    el.style.display = 'block';
     this.position(rect);
   }
   position(rect) {

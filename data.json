@@ -10,5 +10,7 @@
   "showDictionary": true,
   "showTransliteration": false,
   "enabled": true,
-  "restrictToNoteContent": true
+  "restrictToNoteContent": true,
+  "skipSameLanguage": true,
+  "skipIdenticalText": false
 }
