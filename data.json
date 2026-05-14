@@ -6,8 +6,9 @@
   "textType": "word",
   "delayMs": 500,
   "showSourceText": false,
-  "showDetectedLang": false,
+  "showDetectedLang": true,
   "showDictionary": true,
   "showTransliteration": false,
-  "enabled": true
+  "enabled": true,
+  "restrictToNoteContent": true
 }

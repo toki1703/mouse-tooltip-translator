@@ -13,7 +13,23 @@ const DEFAULT_SETTINGS = {
   showDictionary: true,
   showTransliteration: false,
   enabled: true,
+  // When true, only react inside Obsidian note content (editor / preview / rendered embeds).
+  // When false, react across the entire UI (sidebars, headers, etc.) — original behavior.
+  restrictToNoteContent: true,
 };
+
+// Selector for nodes that count as "note content".
+// .cm-content       : CodeMirror 6 editor content (source / live preview)
+// .markdown-preview-view : reading mode container
+// .markdown-rendered     : rendered markdown anywhere (embeds, hover preview, etc.)
+const NOTE_CONTENT_SELECTOR = '.cm-content, .markdown-preview-view, .markdown-rendered';
+
+function isInNoteContent(node) {
+  if (!node) return false;
+  const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  if (!el) return false;
+  return !!el.closest(NOTE_CONTENT_SELECTOR);
+}
 
 const COMMON_LANGS = {
   auto: 'Auto detect',
@@ -660,6 +676,11 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   onMouseMove(e) {
     if (!this.settings.enabled) return;
     if (this.tooltip.isOwn(e.target)) return;
+    if (this.settings.restrictToNoteContent && !isInNoteContent(e.target)) {
+      if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
+      if (!this.selectionActive) this.tooltip.hide();
+      return;
+    }
     if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
 
     const mode = this.settings.triggerMode;
@@ -682,8 +703,17 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (!this.settings.enabled) return;
     const mode = this.settings.triggerMode;
     if (mode === 'mouseover') return;
-    // defer so selection has updated
-    setTimeout(() => this.translateSelection(), 0);
+    // Scope is judged from the selection itself (anchorNode), not from where the mouse
+    // was released — a fast drag can land the cursor outside note content even when
+    // the selection is entirely inside it.
+    setTimeout(() => {
+      if (this.settings.restrictToNoteContent) {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) return;
+        if (!isInNoteContent(sel.anchorNode) && !isInNoteContent(sel.focusNode)) return;
+      }
+      this.translateSelection();
+    }, 0);
   }
 
   onSelectionChange() {
@@ -692,6 +722,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     const sel = window.getSelection();
     const hasSelection = !!(sel && !sel.isCollapsed && sel.toString().trim());
     if (hasSelection) {
+      if (this.settings.restrictToNoteContent
+          && !isInNoteContent(sel.anchorNode)
+          && !isInNoteContent(sel.focusNode)) return;
       // Lock onto the selection — mousemove follow is suspended.
       this.selectionActive = true;
     } else if (this.selectionActive) {
@@ -738,6 +771,17 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .addToggle((t) => t
         .setValue(this.plugin.settings.enabled)
         .onChange(async (v) => { this.plugin.settings.enabled = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName('Restrict to note content')
+      .setDesc('Only react inside the note body (editor, preview, embeds). Turn off to translate anywhere in the Obsidian UI — sidebars, headings, settings, etc.')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.restrictToNoteContent)
+        .onChange(async (v) => {
+          this.plugin.settings.restrictToNoteContent = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
 
     new Setting(containerEl)
       .setName('Translator engine')
