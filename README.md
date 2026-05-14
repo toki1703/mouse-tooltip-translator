@@ -1,5 +1,7 @@
 # Mouse Tooltip Translator for Obsidian
 
+> **"Read effortlessly, learn instantly."**
+> Obsidianでの読書と学習を、マウスホバーだけで完結させる翻訳プラグイン。
 
 <div align="center">
 <a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/" style="text-decoration: none">
@@ -8,7 +10,6 @@
 <a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/stargazers" style="text-decoration: none">
 <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/toki1703/obsidian-mouse-tooltip-translator?color=yellow&label=Stargazers%3A&logo=OpenTelemetry&logoColor=yellow">
 </a>
-
 <a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/releases/latest" style="text-decoration: none">
 <img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/toki1703/obsidian-mouse-tooltip-translator?color=%234e96af&display_name=tag&include_prereleases&label=Latest%20release%3A&logo=Dropbox&logoColor=%236abdd9">
 </a>
@@ -16,151 +17,182 @@
 
 ---
 
-Hover to translate text in Obsidian.
+## 3つの強み
 
-This plugin is inspired by the "Mouse Tooltip Translator" Chrome extension. It shows a translation tooltip when you hover over a word or select text in Obsidian.
+### 1. 思考を止めない「ホバー翻訳」
+ブラウザに切り替える必要はありません。単語や文章にマウスを重ねるだけで、ポップアップが瞬時に意味を提示。Googleの辞書機能（POS）を活用し、品詞や詳細な意味、音写（ローマ字読み）まで表示します。
+
+### 2. 用途別に使い分けるハイブリッド・エンジン
+**Speed** — 爆速のGoogle / Google GTX  
+**Precision** — 信頼のDeepL / Bing / Yandex / Papago  
+**Context** — 文脈を読むLLM（OpenAI互換 / Ollama / LM Studio）
+
+ホバー・テキスト選択・ページ全体翻訳のそれぞれに、最適なエンジンを個別に割り当てられます。
+
+### 3. 「読む」を「資産」に変える単語帳
+調べた履歴は自動的にサイドバーの単語帳へ蓄積。閲覧数・最終確認日・アルファベット順でソートし、単語と文章を絞り込んで効率的に復習できます。
+
+---
+
+## What's New in v1.3.1
+
+- **ページ翻訳の強化**: 翻訳後の段落にホバーすると原文がツールチップ表示される逆引き機能を追加
+- **LLM対応**: Ollama / LM Studio によるローカルAI翻訳、OpenAI互換APIに対応
+- **スマートフィルター**: 同言語・同一テキストの場合はツールチップを非表示にするオプションを追加
+- **温度設定**: LLMエンジンの生成ランダム性を各エンジンごとに調整可能
+
+---
 
 ## Features
 
-- Translate a word under the mouse cursor
-- Translate selected text
-- **Translate entire pages** in Reading View
-- **Translation history / vocabulary list** — view and sort all past translations in a sidebar panel
-- Choose how translations are triggered:
-  - Mouseover
-  - Selection
-  - Mouseover + Selection
-- Choose the mouseover unit:
-  - Word
-  - Sentence
-- **Per-context engine selection** — use a different engine for hover, selection, and page translation
-- Select the translation engine:
-  - Google
-  - Google GTX
-  - DeepL
-  - Bing
-  - Yandex
-  - Papago
-  - **OpenAI-compatible API** (OpenAI, Azure, local servers, etc.)
-  - **Ollama** (local)
-  - **LM Studio** (local)
-- Auto-detect the source language
-- Configure source and target languages
-- Configure hover delay
-- Show dictionary entries with parts of speech when available
-- Show transliteration / romanization when available
-- Show the original source text in the tooltip
-- Show detected language information
-- Cache translation results for faster repeated lookups
-- **Restrict translation to note content** — optionally limit to editor/preview instead of the entire UI
-- **Skip same-language translations** — hide tooltip when source and target language match
-- **Skip identical translations** — hide tooltip when the translated text is identical to the input
-- Use Obsidian theme colors for the tooltip
-- Use commands from the command palette:
-  - Hide tooltip
-  - Toggle translator on/off
-  - Translate current selection
-  - **Translate current page**
-  - **Restore original text (page translation)**
-  - **Open vocabulary list**
+- 単語・文章のホバー翻訳
+- 選択テキストの翻訳
+- **閲覧モード（Reading View）でのページ全体翻訳**
+- **翻訳履歴 / 単語帳** — サイドバーパネルで過去の翻訳をすべて閲覧・ソート
+- トリガーを選択: マウスオーバー / テキスト選択 / 両方
+- ホバー単位を選択: 単語 / 文章
+- **コンテキスト別エンジン選択** — ホバー・選択・ページ翻訳に異なるエンジンを割り当て
+- 9種類の翻訳エンジン対応
+- 翻訳元言語の自動検出
+- ホバーディレイの設定
+- 辞書エントリ（品詞付き）の表示
+- 音写 / ローマ字読みの表示
+- 翻訳元テキストの表示
+- 検出言語情報の表示
+- 翻訳結果のメモリキャッシュ（高速な再検索）
+- **ノートコンテンツへの制限** — エディタ・プレビュー内のみに翻訳を限定するオプション
+- **同言語スキップ** — 翻訳元と翻訳先が同じ言語の場合はツールチップを非表示
+- **同一テキストスキップ** — 翻訳結果が入力と同じ場合はツールチップを非表示
+- Obsidianテーマカラーの自動適用
+- コマンドパレット対応:
+  - ツールチップを非表示
+  - 翻訳のオン/オフ切り替え
+  - 選択テキストの翻訳
+  - **現在のページを翻訳**
+  - **原文に戻す（ページ翻訳）**
+  - **単語帳を開く**
+
+---
 
 ## Usage
 
-1. Enable the plugin in Obsidian.
-2. Open the plugin settings.
-3. Choose your translation engine and target language.
-4. Hover over a word or select text to show the translation tooltip.
+1. ObsidianでプラグインをEnableにする
+2. プラグイン設定を開く
+3. 翻訳エンジンと翻訳先言語を選択する
+4. 単語にホバーするか、テキストを選択して翻訳ツールチップを表示する
 
-Press `Esc` to hide the tooltip.
+`Esc` キーでツールチップを閉じます。
 
-### Page Translation
+### ページ翻訳
 
-Switch to **Reading View**, then click the languages icon (🌐) in the view header or run the **Translate current page** command. A progress bar appears while each block is translated. Click the icon again (or run **Restore original text**) to revert to the original. You can also cancel mid-translation by clicking the ✕ button on the progress bar.
+**閲覧モード（Reading View）** に切り替え、ビューヘッダーの言語アイコン（🌐）をクリックするか、**「現在のページを翻訳」** コマンドを実行します。各ブロックの翻訳中はプログレスバーが表示されます。再度アイコンをクリック（または **「原文に戻す」** コマンドを実行）すると元の表示に戻ります。プログレスバーの ✕ ボタンで翻訳をキャンセルすることもできます。
 
-### Vocabulary List
+翻訳後は、各段落にホバーすると原文がツールチップで確認できます。
 
-Click the book icon in the ribbon or run **Open vocabulary list** to open the sidebar panel. All past translations are listed with their view count. You can sort by view count, most recently seen, or alphabetically, and filter to show only words or sentences.
+### 単語帳
+
+リボンの本のアイコンをクリックするか、**「単語帳を開く」** コマンドを実行してサイドバーパネルを開きます。過去の翻訳が閲覧数とともに一覧表示され、閲覧数・最終確認日・アルファベット順にソートしたり、単語・文章でフィルタリングしたりできます。
+
+---
 
 ## Settings
 
-| Setting | Description |
+| 設定 | 説明 |
 | --- | --- |
-| Enabled | Master switch for the translator |
-| Restrict to note content | Only react inside the note body (editor, preview, embeds). Disable to translate anywhere in the Obsidian UI |
-| **ホバー翻訳エンジン** | Engine used for mouseover translation |
-| **テキスト選択エンジン** | Engine used for selection translation |
-| **ページ翻訳エンジン** | Engine used for page translation |
-| Translate from | Source language, including auto-detect |
-| Translate to | Target language |
-| Trigger | Mouseover, selection, or both |
-| Mouseover unit | Translate a word or sentence under the cursor |
-| Hover delay | Wait time before translation starts |
-| Show dictionary | Show dictionary-style results when available |
-| Show transliteration | Show romanization / reading when available |
-| Show source text | Show the original text in the tooltip |
-| Show detected language | Show detected source and target language |
-| Skip same-language translations | Hide tooltip when detected source language matches target language |
-| Skip identical translations (strict) | Also hide when translated text is identical to source text |
-| Disable translation cache | Always call the API on every request, bypassing the in-memory cache |
+| Enabled | 翻訳機能のマスタースイッチ |
+| Restrict to note content | ノート本文（エディタ・プレビュー・埋め込み）内のみに反応。無効にするとObsidian UI全体で翻訳 |
+| ホバー翻訳エンジン | マウスオーバー翻訳に使用するエンジン |
+| テキスト選択エンジン | テキスト選択翻訳に使用するエンジン |
+| ページ翻訳エンジン | ページ全体翻訳に使用するエンジン |
+| Translate from | 翻訳元言語（自動検出を含む） |
+| Translate to | 翻訳先言語 |
+| Trigger | マウスオーバー・選択・両方 |
+| Mouseover unit | カーソル下の単語または文章を翻訳 |
+| Hover delay | 翻訳開始までの待機時間 |
+| Show dictionary | 利用可能な場合に辞書形式の結果を表示 |
+| Show transliteration | 音写 / ローマ字読みを表示 |
+| Show source text | ツールチップに元のテキストを表示 |
+| Show detected language | 検出した翻訳元・翻訳先言語を表示 |
+| Skip same-language translations | 検出言語と翻訳先言語が一致する場合はツールチップを非表示 |
+| Skip identical translations (strict) | 翻訳結果が入力テキストと同一の場合も非表示 |
+| Disable translation cache | 毎回APIを呼び出し、メモリキャッシュをバイパス |
+
+---
 
 ## Translation Engines
 
-The default engine is Google.
+デフォルトエンジンはGoogleです。
 
-Some engines are experimental and may stop working if the upstream web service changes.
+実験的なエンジンは、上流サービスの変更により動作しなくなる場合があります。
 
-| Engine | Notes |
+| エンジン | 備考 |
 | --- | --- |
-| Google | Default engine. Supports dictionary entries and transliteration when available |
-| Google GTX | Alternative Google endpoint |
-| DeepL | Experimental web endpoint |
-| Bing | Experimental web endpoint |
-| Yandex | Experimental web endpoint |
-| Papago | Experimental web endpoint |
-| OpenAI-compatible API | Any server that implements the OpenAI chat completions API. Requires API URL and model name. Optionally accepts an API key and a custom prompt template |
-| Ollama | Local inference via Ollama. Requires a running Ollama server and a model name |
-| LM Studio | Local inference via LM Studio. Requires a running LM Studio server and a model name |
+| Google | デフォルト。辞書エントリと音写に対応 |
+| Google GTX | Googleの代替エンドポイント |
+| DeepL | 実験的なWebエンドポイント |
+| Bing | 実験的なWebエンドポイント |
+| Yandex | 実験的なWebエンドポイント |
+| Papago | 実験的なWebエンドポイント |
+| OpenAI-compatible API | OpenAI Chat Completions APIを実装した任意のサーバー。API URLとモデル名が必要。APIキーとカスタムプロンプトテンプレートも指定可能 |
+| Ollama | Ollamaによるローカル推論。Ollamaサーバーの起動とモデル名の指定が必要 |
+| LM Studio | LM Studioによるローカル推論。LM Studioサーバーの起動とモデル名の指定が必要 |
 
-### LLM Engine Settings
+### LLMエンジン設定
 
-When an LLM engine (OpenAI-compatible, Ollama, or LM Studio) is selected for any context, the following additional settings appear:
+いずれかのコンテキストでLLMエンジン（OpenAI互換・Ollama・LM Studio）を選択すると、以下の追加設定が表示されます。
 
-| Setting | Description |
+| 設定 | 説明 |
 | --- | --- |
-| API URL | Base URL of the server (e.g. `https://api.openai.com`, `http://localhost:11434`) |
-| API Key | API key (OpenAI-compatible only; leave blank for local servers) |
-| Model | Model name to use for translation |
-| Temperature | Randomness of generation. `0` = deterministic, `2` = maximum random. Default: `0` |
-| プロンプトテンプレート | Custom prompt template. Use `{{text}}` for the source text and `{{targetLang}}` for the target language name. Leave blank to use the built-in default |
+| API URL | サーバーのベースURL（例: `https://api.openai.com`、`http://localhost:11434`） |
+| API Key | APIキー（OpenAI互換のみ。ローカルサーバーの場合は空欄） |
+| Model | 翻訳に使用するモデル名 |
+| Temperature | 生成のランダム性。`0` = 決定論的、`2` = 最大ランダム。デフォルト: `0` |
+| プロンプトテンプレート | カスタムプロンプトテンプレート。`{{text}}` で原文、`{{targetLang}}` で翻訳先言語名を参照。空欄の場合は組み込みのデフォルトを使用 |
+
+---
 
 ## Installation
 
-### Manual installation
+### Community Plugins（推奨）
 
-1. Download `main.js`, `manifest.json`, and `styles.css`.
-2. Place them in:
+Obsidianの設定 → Community plugins → Browse で `Mouse Tooltip Translator` を検索してインストール。
 
-   ```text
+### Manual Installation
+
+1. `main.js`、`manifest.json`、`styles.css` をダウンロード
+2. 以下のパスに配置:
+
+   ```
    <your vault>/.obsidian/plugins/obsidian-mouse-tooltip-translator/
    ```
 
-3. Restart Obsidian or reload plugins.
-4. Enable `Mouse Tooltip Translator for Obsidian` from Community plugins.
+3. Obsidianを再起動またはプラグインをリロード
+4. Community plugins から `Mouse Tooltip Translator for Obsidian` を有効化
+
+---
 
 ## Requirements
 
-- Obsidian desktop app
-- Minimum Obsidian version: `0.15.0`
+- Obsidian デスクトップアプリ
+- 最低バージョン: `1.12.0`
 
-This plugin is desktop-only.
+このプラグインはデスクトップ専用です。
+
+---
 
 ## Notes
 
-- Translation requests are sent to the selected translation service.
-- The plugin uses Obsidian's `requestUrl` API for network requests.
-- Experimental engines may be unstable depending on upstream service changes.
-- Translation history is stored in `translation-log.json` inside the plugin folder.
+- 翻訳リクエストは選択した翻訳サービスに送信されます。
+- ネットワークリクエストにはObsidianの `requestUrl` APIを使用します。
+- 実験的なエンジンは上流サービスの変更により不安定になる場合があります。
+- 翻訳履歴はプラグインフォルダ内の `translation-log.json` に保存されます。
+
+---
 
 ## License
 
-No license has been specified yet.
+Mit License
+
+---
+
+*Inspired by the [Mouse Tooltip Translator](https://chromewebstore.google.com/detail/mouse-tooltip-translator/hmigninkgibhdckiaphhmbgcghochdjc?hl=ja) Chrome extension.*
