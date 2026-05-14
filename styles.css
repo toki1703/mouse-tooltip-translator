@@ -62,3 +62,148 @@
   font-style: italic;
   font-size: 0.88em;
 }
+
+/* ── Vocabulary view ─────────────────────────────────────── */
+.mtt-vocab-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mtt-vocab-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.mtt-vocab-title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 1em;
+}
+
+.mtt-vocab-reload {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1.1em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.mtt-vocab-reload:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.mtt-vocab-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-wrap: wrap;
+}
+
+.mtt-vocab-sort {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.82em;
+  cursor: pointer;
+}
+
+.mtt-vocab-filter-wrap {
+  display: flex;
+  gap: 4px;
+}
+
+.mtt-vocab-filter-btn {
+  background: none;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8em;
+  padding: 2px 9px;
+}
+.mtt-vocab-filter-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.mtt-vocab-filter-btn:hover:not(.is-active) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.mtt-vocab-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.mtt-vocab-card {
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+.mtt-vocab-card:hover {
+  background: var(--background-modifier-hover);
+}
+
+.mtt-vocab-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mtt-vocab-source {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.mtt-vocab-sep {
+  color: var(--text-faint);
+  font-size: 0.85em;
+}
+
+.mtt-vocab-target {
+  color: var(--text-accent);
+  flex: 1;
+}
+
+.mtt-vocab-count {
+  color: var(--text-faint);
+  font-size: 0.78em;
+  white-space: nowrap;
+}
+
+.mtt-vocab-pos-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mtt-vocab-pos-entry {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
+.mtt-vocab-pos-label {
+  color: var(--text-accent-hover, var(--text-accent));
+}
+
+.mtt-vocab-empty {
+  padding: 20px 12px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.9em;
+}

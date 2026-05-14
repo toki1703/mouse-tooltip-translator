@@ -1,4 +1,4 @@
-const { Plugin, PluginSettingTab, Setting, Notice, requestUrl } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Notice, requestUrl, ItemView } = require('obsidian');
 const nodeCrypto = require('crypto');
 
 const DEFAULT_SETTINGS = {
@@ -595,6 +595,10 @@ class TooltipManager {
     }
     this.cache.set(key, val);
     if (this.log) this.log.record(key, val, sourceText);
+    if (this.plugin) {
+      this.plugin.app.workspace.getLeavesOfType(VOCAB_VIEW_TYPE)
+        .forEach(l => { if (l.view && l.view.refresh) l.view.refresh(); });
+    }
   }
   async show(text, rect) {
     if (!text) return;
@@ -726,6 +730,109 @@ class TooltipManager {
   }
 }
 
+const VOCAB_VIEW_TYPE = 'mtt-vocab-view';
+
+class VocabView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this._sort = 'count-desc';
+    this._filter = 'all';
+    this._listEl = null;
+  }
+
+  getViewType() { return VOCAB_VIEW_TYPE; }
+  getDisplayText() { return '単語帳'; }
+  getIcon() { return 'book-open'; }
+
+  async onOpen() { this.render(); }
+
+  render() {
+    const root = this.containerEl.children[1];
+    root.empty();
+    root.addClass('mtt-vocab-root');
+
+    const header = root.createEl('div', { cls: 'mtt-vocab-header' });
+    header.createEl('span', { cls: 'mtt-vocab-title', text: '単語帳' });
+    const reload = header.createEl('button', { cls: 'mtt-vocab-reload', title: '再読み込み' });
+    reload.textContent = '↻';
+    reload.addEventListener('click', () => this.refresh());
+
+    const controls = root.createEl('div', { cls: 'mtt-vocab-controls' });
+
+    const sortSelect = controls.createEl('select', { cls: 'mtt-vocab-sort' });
+    for (const [value, label] of [
+      ['count-desc', '閲覧数順'],
+      ['last-desc', '最近見た順'],
+      ['alpha', 'アルファベット順'],
+    ]) {
+      const opt = sortSelect.createEl('option', { text: label });
+      opt.value = value;
+      if (value === this._sort) opt.selected = true;
+    }
+    sortSelect.addEventListener('change', () => { this._sort = sortSelect.value; this.refresh(); });
+
+    const filterWrap = controls.createEl('div', { cls: 'mtt-vocab-filter-wrap' });
+    for (const [value, label] of [['all', 'すべて'], ['word', '単語'], ['sentence', '文']]) {
+      const btn = filterWrap.createEl('button', { cls: 'mtt-vocab-filter-btn', text: label });
+      btn.dataset.filter = value;
+      if (value === this._filter) btn.addClass('is-active');
+      btn.addEventListener('click', () => {
+        this._filter = value;
+        filterWrap.querySelectorAll('.mtt-vocab-filter-btn').forEach(b =>
+          b.classList.toggle('is-active', b.dataset.filter === value)
+        );
+        this.refresh();
+      });
+    }
+
+    this._listEl = root.createEl('div', { cls: 'mtt-vocab-list' });
+    this._renderList();
+  }
+
+  refresh() {
+    if (this._listEl) this._renderList();
+  }
+
+  _renderList() {
+    const container = this._listEl;
+    container.empty();
+    const entries = Object.values(this.plugin.log.entries);
+
+    let filtered = entries;
+    if (this._filter === 'word') filtered = entries.filter(e => e.type === 'word');
+    else if (this._filter === 'sentence') filtered = entries.filter(e => e.type === 'sentence');
+
+    const sorted = [...filtered];
+    if (this._sort === 'count-desc') sorted.sort((a, b) => b.count - a.count);
+    else if (this._sort === 'last-desc') sorted.sort((a, b) => b.lastSeen - a.lastSeen);
+    else sorted.sort((a, b) => a.sourceText.localeCompare(b.sourceText));
+
+    if (sorted.length === 0) {
+      container.createEl('div', { cls: 'mtt-vocab-empty', text: '翻訳履歴がありません' });
+      return;
+    }
+
+    for (const entry of sorted) {
+      const card = container.createEl('div', { cls: 'mtt-vocab-card' });
+      const main = card.createEl('div', { cls: 'mtt-vocab-main' });
+      main.createEl('span', { cls: 'mtt-vocab-source', text: entry.sourceText });
+      main.createEl('span', { cls: 'mtt-vocab-sep', text: ' → ' });
+      main.createEl('span', { cls: 'mtt-vocab-target', text: entry.targetText });
+      main.createEl('span', { cls: 'mtt-vocab-count', text: `×${entry.count}` });
+
+      if (Array.isArray(entry.pos) && entry.pos.length > 0) {
+        const posWrap = card.createEl('div', { cls: 'mtt-vocab-pos-wrap' });
+        for (const { pos, terms } of entry.pos) {
+          const row = posWrap.createEl('span', { cls: 'mtt-vocab-pos-entry' });
+          if (pos) row.createEl('span', { cls: 'mtt-vocab-pos-label', text: pos + ': ' });
+          row.appendText((terms || []).join(' / '));
+        }
+      }
+    }
+  }
+}
+
 module.exports = class MouseTooltipPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
@@ -740,6 +847,15 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
     this.addSettingTab(new MouseTooltipSettingTab(this.app, this));
 
+    this.registerView(VOCAB_VIEW_TYPE, (leaf) => new VocabView(leaf, this));
+
+    this.addRibbonIcon('book-open', '単語帳を開く', () => this.openVocabView());
+
+    this.addCommand({
+      id: 'mtt-open-vocab',
+      name: 'Open vocabulary list',
+      callback: () => this.openVocabView(),
+    });
     this.addCommand({
       id: 'mtt-hide-tooltip',
       name: 'Hide tooltip',
@@ -790,6 +906,20 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   async onunload() {
     if (this.pendingTimer) clearTimeout(this.pendingTimer);
     if (this.tooltip) await this.tooltip.destroy();
+    this.app.workspace.detachLeavesOfType(VOCAB_VIEW_TYPE);
+  }
+
+  async openVocabView() {
+    const existing = this.app.workspace.getLeavesOfType(VOCAB_VIEW_TYPE);
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (leaf) {
+      await leaf.setViewState({ type: VOCAB_VIEW_TYPE, active: true });
+      this.app.workspace.revealLeaf(leaf);
+    }
   }
 
   onMouseMove(e) {
