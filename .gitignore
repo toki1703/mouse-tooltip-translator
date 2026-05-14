@@ -1,2 +1,4 @@
 # 翻訳ログファイルを無視
 translation-log.json
+
+.claude/

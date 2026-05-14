@@ -207,3 +207,62 @@
   text-align: center;
   font-size: 0.9em;
 }
+
+/* ── Page Translation ────────────────────────────────────────── */
+.mtt-page-progress {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85em;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  color: var(--text-normal);
+  min-width: 260px;
+  pointer-events: auto;
+}
+
+.mtt-page-progress-label {
+  flex: none;
+  white-space: nowrap;
+}
+
+.mtt-page-progress-bar-wrap {
+  flex: 1;
+  height: 4px;
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.mtt-page-progress-bar {
+  height: 100%;
+  background: var(--interactive-accent);
+  border-radius: 2px;
+  transition: width 0.15s ease;
+}
+
+.mtt-page-progress-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1em;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  flex: none;
+}
+
+.mtt-page-progress-cancel:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}

@@ -833,12 +833,158 @@ class VocabView extends ItemView {
   }
 }
 
+// ── Page Translator ───────────────────────────────────────────────────────────
+class PageTranslator {
+  constructor(plugin) {
+    this.plugin = plugin;
+    this._cancelled = false;
+    this._running = false;
+    this._progressEl = null;
+  }
+
+  // Returns the .markdown-rendered container for the active reading-view leaf,
+  // or null when not in reading mode.
+  _getContainer() {
+    const leaf = this.plugin.app.workspace.activeLeaf;
+    const view = leaf?.view;
+    if (!view) return null;
+    if (view.getMode?.() !== 'preview') return null;
+    const previewEl = view.previewMode?.containerEl;
+    if (!previewEl) return null;
+    return previewEl.querySelector('.markdown-rendered') ?? previewEl;
+  }
+
+  // Returns leaf-level translatable block elements (headings, paragraphs, list
+  // items, table cells, etc.) that haven't been translated yet.
+  _getBlocks(container) {
+    const SEL = 'h1,h2,h3,h4,h5,h6,p,li,td,th,figcaption';
+    return Array.from(container.querySelectorAll(SEL)).filter(el => {
+      // Skip content inside code/math/frontmatter
+      if (el.closest('pre,.math,.math-block,.frontmatter-container,.katex')) return false;
+      // Skip already translated
+      if (el.hasAttribute('data-mtt-orig')) return false;
+      // Only translate leaf-level elements — skip if nested blocks exist inside
+      // (prevents double-translating a li > p hierarchy).
+      if (el.querySelector('h1,h2,h3,h4,h5,h6,p,li,td,th')) return false;
+      return el.textContent.trim().length >= 2;
+    });
+  }
+
+  _showProgress(current, total) {
+    if (!this._progressEl) {
+      const el = document.createElement('div');
+      el.className = 'mtt-page-progress';
+      el.innerHTML = `<span class="mtt-page-progress-label"></span>` +
+        `<div class="mtt-page-progress-bar-wrap"><div class="mtt-page-progress-bar"></div></div>` +
+        `<button class="mtt-page-progress-cancel" aria-label="キャンセル">✕</button>`;
+      el.querySelector('.mtt-page-progress-cancel').onclick = () => this.cancel();
+      document.body.appendChild(el);
+      this._progressEl = el;
+    }
+    const pct = total > 0 ? Math.round(current / total * 100) : 0;
+    this._progressEl.querySelector('.mtt-page-progress-label').textContent =
+      `ページ翻訳中... ${current}/${total}`;
+    this._progressEl.querySelector('.mtt-page-progress-bar').style.width = `${pct}%`;
+  }
+
+  _hideProgress() {
+    if (this._progressEl) { this._progressEl.remove(); this._progressEl = null; }
+  }
+
+  cancel() {
+    this._cancelled = true;
+    this._running = false;
+    this._hideProgress();
+  }
+
+  hasTranslation() {
+    const container = this._getContainer();
+    return !!(container && container.querySelector('[data-mtt-orig]'));
+  }
+
+  async translatePage() {
+    if (this._running) {
+      new Notice('ページ翻訳は既に実行中です');
+      return;
+    }
+    const container = this._getContainer();
+    if (!container) {
+      new Notice('ページ翻訳には閲覧モード（Reading View）に切り替えてください');
+      return;
+    }
+    const blocks = this._getBlocks(container);
+    if (blocks.length === 0) {
+      new Notice('翻訳するテキストが見つかりませんでした');
+      return;
+    }
+
+    this._running = true;
+    this._cancelled = false;
+
+    const { engine, sourceLang, targetLang } = this.plugin.settings;
+    const eng = ENGINES[engine] || ENGINES.google;
+
+    this._showProgress(0, blocks.length);
+    let done = 0;
+
+    for (const el of blocks) {
+      if (this._cancelled) break;
+      const originalText = el.textContent.trim();
+      if (!originalText) { done++; continue; }
+
+      try {
+        const result = await eng.translate(originalText, sourceLang, targetLang);
+        if (this._cancelled) break;
+        if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
+          el.setAttribute('data-mtt-orig', el.innerHTML);
+          el.textContent = result.targetText;
+          el.classList.add('mtt-page-translated');
+        }
+      } catch (e) {
+        console.warn('[mtt] page translation error:', e);
+      }
+
+      done++;
+      this._showProgress(done, blocks.length);
+      // Yield every 3 blocks to keep the UI responsive and avoid rate-limiting.
+      if (done % 3 === 0) await new Promise(r => setTimeout(r, 50));
+    }
+
+    this._hideProgress();
+    this._running = false;
+
+    if (!this._cancelled) {
+      new Notice(`ページ翻訳完了 (${done}/${blocks.length} セクション)`);
+    }
+  }
+
+  restorePage() {
+    const container = this._getContainer();
+    if (!container) {
+      new Notice('閲覧モードでのみ復元できます');
+      return;
+    }
+    const translated = container.querySelectorAll('[data-mtt-orig]');
+    if (translated.length === 0) {
+      new Notice('翻訳済みのテキストが見つかりませんでした');
+      return;
+    }
+    translated.forEach(el => {
+      el.innerHTML = el.getAttribute('data-mtt-orig');
+      el.removeAttribute('data-mtt-orig');
+      el.classList.remove('mtt-page-translated');
+    });
+    new Notice(`元のテキストに復元しました (${translated.length} セクション)`);
+  }
+}
+
 module.exports = class MouseTooltipPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
     this.log = new TranslationLog(this.app, this.manifest.dir);
     await this.log.load();
     this.tooltip = new TooltipManager(this, this.log);
+    this.pageTranslator = new PageTranslator(this);
     this.pendingTimer = null;
     this.lastTriggerKey = '';
     // Selection-priority lock: while a non-empty selection exists, mouseover follow is paused
@@ -850,6 +996,13 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     this.registerView(VOCAB_VIEW_TYPE, (leaf) => new VocabView(leaf, this));
 
     this.addRibbonIcon('book-open', '単語帳を開く', () => this.openVocabView());
+    this.addRibbonIcon('languages', 'ページを翻訳 / 元に戻す', () => {
+      if (this.pageTranslator.hasTranslation()) {
+        this.pageTranslator.restorePage();
+      } else {
+        this.pageTranslator.translatePage();
+      }
+    });
 
     this.addCommand({
       id: 'mtt-open-vocab',
@@ -875,6 +1028,16 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       id: 'mtt-translate-selection',
       name: 'Translate current selection',
       callback: () => this.translateSelection(),
+    });
+    this.addCommand({
+      id: 'mtt-translate-page',
+      name: 'Translate current page',
+      callback: () => this.pageTranslator.translatePage(),
+    });
+    this.addCommand({
+      id: 'mtt-restore-page',
+      name: 'Restore original text (page translation)',
+      callback: () => this.pageTranslator.restorePage(),
     });
 
     this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
@@ -905,6 +1068,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
   async onunload() {
     if (this.pendingTimer) clearTimeout(this.pendingTimer);
+    if (this.pageTranslator?._running) this.pageTranslator.cancel();
     if (this.tooltip) await this.tooltip.destroy();
     this.app.workspace.detachLeavesOfType(VOCAB_VIEW_TYPE);
   }
