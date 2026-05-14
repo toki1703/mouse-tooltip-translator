@@ -1030,8 +1030,9 @@ class PageTranslator {
     this._running = true;
     this._cancelled = false;
 
-    const { engine, sourceLang, targetLang } = this.plugin.settings;
+    const { engine, sourceLang, targetLang, disableCache } = this.plugin.settings;
     const eng = ENGINES[engine] || ENGINES.google;
+    const tooltip = this.plugin.tooltip;
 
     this._showProgress(0, blocks.length);
     let done = 0;
@@ -1042,7 +1043,10 @@ class PageTranslator {
       if (!originalText) { done++; continue; }
 
       try {
-        const result = await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
+        const key = `v2|${engine}|${sourceLang}|${targetLang}|${originalText}`;
+        const cached = disableCache ? null : tooltip?.cacheGet(key);
+        const result = cached ?? await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
+        if (!cached && result?.targetText) tooltip?.cacheSet(key, result, originalText);
         if (this._cancelled) break;
         if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
           el.setAttribute('data-mtt-orig', el.innerHTML);
