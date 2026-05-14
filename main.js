@@ -484,9 +484,78 @@ function extractAtPoint(x, y, mode) {
   return { text: slice, rect };
 }
 
+// Persists translation history to translation-log.json in the plugin folder.
+// Each entry records the source/target text, languages, and view count.
+// Writes are debounced to 2 s to avoid hammering the filesystem on every hover.
+class TranslationLog {
+  constructor(app, pluginDir) {
+    this.app = app;
+    this.filePath = `${pluginDir}/translation-log.json`;
+    this.entries = {};
+    this.saveTimer = null;
+  }
+
+  async load() {
+    try {
+      if (await this.app.vault.adapter.exists(this.filePath)) {
+        const raw = await this.app.vault.adapter.read(this.filePath);
+        const data = JSON.parse(raw);
+        if (data && typeof data.entries === 'object') this.entries = data.entries;
+      }
+    } catch (e) {
+      console.warn('[mtt] translation-log load failed:', e);
+      this.entries = {};
+    }
+  }
+
+  record(key, result, sourceText) {
+    const now = Date.now();
+    if (this.entries[key]) {
+      this.entries[key].count++;
+      this.entries[key].lastSeen = now;
+    } else {
+      this.entries[key] = {
+        sourceText,
+        targetText: result.targetText,
+        sourceLang: result.sourceLang,
+        targetLang: result.targetLang,
+        count: 1,
+        firstSeen: now,
+        lastSeen: now,
+      };
+    }
+    this._scheduleSave();
+  }
+
+  _scheduleSave() {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this._flush(), 2000);
+  }
+
+  async _flush() {
+    this.saveTimer = null;
+    try {
+      await this.app.vault.adapter.write(
+        this.filePath,
+        JSON.stringify({ version: 1, entries: this.entries }, null, 2)
+      );
+    } catch (e) {
+      console.warn('[mtt] translation-log save failed:', e);
+    }
+  }
+
+  async destroy() {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      await this._flush();
+    }
+  }
+}
+
 class TooltipManager {
-  constructor(plugin) {
+  constructor(plugin, log) {
     this.plugin = plugin;
+    this.log = log;
     this.el = null;
     this.token = 0;
     this.lastText = '';
@@ -511,12 +580,13 @@ class TooltipManager {
     return !!(this.el && target instanceof Node && this.el.contains(target));
   }
   cacheGet(key) { return this.cache.get(key); }
-  cacheSet(key, val) {
+  cacheSet(key, val, sourceText) {
     if (this.cache.size >= this.maxCache) {
       const k = this.cache.keys().next().value;
       this.cache.delete(k);
     }
     this.cache.set(key, val);
+    if (this.log) this.log.record(key, val, sourceText);
   }
   async show(text, rect) {
     if (!text) return;
@@ -560,7 +630,7 @@ class TooltipManager {
         }
         return;
       }
-      if (result && result.targetText) this.cacheSet(key, result);
+      if (result && result.targetText) this.cacheSet(key, result, text);
     }
     if (my !== this.token) return;
     if (!result || !result.targetText) {
@@ -640,17 +710,20 @@ class TooltipManager {
     this.el.style.left = `${x}px`;
     this.el.style.top = `${y}px`;
   }
-  destroy() {
+  async destroy() {
     this.hide();
     if (this.el) { this.el.remove(); this.el = null; }
     this.cache.clear();
+    if (this.log) await this.log.destroy();
   }
 }
 
 module.exports = class MouseTooltipPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
-    this.tooltip = new TooltipManager(this);
+    this.log = new TranslationLog(this.app, this.manifest.dir);
+    await this.log.load();
+    this.tooltip = new TooltipManager(this, this.log);
     this.pendingTimer = null;
     this.lastTriggerKey = '';
     // Selection-priority lock: while a non-empty selection exists, mouseover follow is paused
@@ -706,9 +779,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     console.log('[mouse-tooltip-translator] loaded');
   }
 
-  onunload() {
+  async onunload() {
     if (this.pendingTimer) clearTimeout(this.pendingTimer);
-    if (this.tooltip) this.tooltip.destroy();
+    if (this.tooltip) await this.tooltip.destroy();
   }
 
   onMouseMove(e) {
