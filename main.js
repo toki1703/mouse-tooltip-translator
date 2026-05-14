@@ -436,7 +436,7 @@ class LLMEngine extends BaseTranslator {
     return `Translate the following text to ${tgtName}. Output only the translated text, nothing else.\n\n${text}`;
   }
 
-  static async _chatRequest(text, etgt, { url, model, apiKey, prompt }) {
+  static async _chatRequest(text, etgt, { url, model, apiKey, prompt, temperature }) {
     if (!model) throw new Error('モデル名が未設定です。設定から入力してください。');
     const endpoint = `${(url || '').replace(/\/+$/, '')}/v1/chat/completions`;
     const headers = { 'Content-Type': 'application/json' };
@@ -446,7 +446,7 @@ class LLMEngine extends BaseTranslator {
       body: {
         model,
         messages: [{ role: 'user', content: this._buildPrompt(text, etgt, prompt) }],
-        temperature: 0,
+        temperature: temperature ?? 0,
       },
     });
   }
@@ -467,6 +467,7 @@ class OpenAICompatEngine extends LLMEngine {
       model: settings?.openaiCompatModel || 'gpt-4o-mini',
       apiKey: settings?.openaiCompatApiKey || '',
       prompt: settings?.openaiCompatPrompt || '',
+      temperature: settings?.openaiCompatTemperature ?? 0,
     });
   }
 }
@@ -478,6 +479,7 @@ class OllamaEngine extends LLMEngine {
       model: settings?.ollamaModel || '',
       apiKey: '',
       prompt: settings?.ollamaPrompt || '',
+      temperature: settings?.ollamaTemperature ?? 0,
     });
   }
 }
@@ -489,6 +491,7 @@ class LMStudioEngine extends LLMEngine {
       model: settings?.lmstudioModel || '',
       apiKey: 'lm-studio',
       prompt: settings?.lmstudioPrompt || '',
+      temperature: settings?.lmstudioTemperature ?? 0,
     });
   }
 }
@@ -1427,6 +1430,17 @@ class MouseTooltipSettingTab extends PluginSettingTab {
             .setValue(this.plugin.settings[modelKey] || '')
             .onChange(async (v) => { this.plugin.settings[modelKey] = v.trim(); await this.plugin.saveSettings(); });
         });
+
+      const tempKey = eng === 'openaiCompat' ? 'openaiCompatTemperature'
+        : eng === 'ollama' ? 'ollamaTemperature' : 'lmstudioTemperature';
+      new Setting(containerEl)
+        .setName('Temperature')
+        .setDesc('生成のランダム性。0 = 決定論的、2 = 最大ランダム。既定値: 0.0')
+        .addSlider((s) => s
+          .setLimits(0, 2, 0.1)
+          .setValue(this.plugin.settings[tempKey] ?? 0)
+          .setDynamicTooltip()
+          .onChange(async (v) => { this.plugin.settings[tempKey] = v; await this.plugin.saveSettings(); }));
 
       const promptKey = eng === 'openaiCompat' ? 'openaiCompatPrompt'
         : eng === 'ollama' ? 'ollamaPrompt' : 'lmstudioPrompt';
