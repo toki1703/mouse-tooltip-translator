@@ -4,8 +4,8 @@
   max-width: 420px;
   padding: 6px 10px;
   background: var(--background-secondary, #2b2b2b);
-  color: var(--text-normal, #eee);
-  border: 1px solid var(--background-modifier-border, #444);
+  color: var(--text-normal, #eeeeee);
+  border: 1px solid var(--background-modifier-border, #444444);
   border-radius: 6px;
   font-size: 0.9em;
   line-height: 1.5;
@@ -17,20 +17,20 @@
 }
 
 .mtt-tooltip .mtt-target {
-  color: var(--text-normal, #eee);
+  color: var(--text-normal, #eeeeee);
 }
 
 .mtt-tooltip .mtt-source {
   margin-top: 4px;
   padding-top: 4px;
-  border-top: 1px dashed var(--background-modifier-border, #444);
-  color: var(--text-muted, #aaa);
+  border-top: 1px dashed var(--background-modifier-border, #444444);
+  color: var(--text-muted, #aaaaaa);
   font-size: 0.88em;
 }
 
 .mtt-tooltip .mtt-meta {
   margin-top: 4px;
-  color: var(--text-faint, #888);
+  color: var(--text-faint, #888888);
   font-size: 0.78em;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -53,12 +53,12 @@
 }
 
 .mtt-tooltip .mtt-terms {
-  color: var(--text-normal, #eee);
+  color: var(--text-normal, #eeeeee);
 }
 
 .mtt-tooltip .mtt-translit {
   margin-top: 4px;
-  color: var(--text-muted, #aaa);
+  color: var(--text-muted, #aaaaaa);
   font-style: italic;
   font-size: 0.88em;
 }
@@ -275,18 +275,18 @@
 /* ── Page-translation hover: original text preview ──────────── */
 .mtt-tooltip .mtt-orig-label {
   font-size: 0.78em;
-  color: var(--text-faint, #888);
+  color: var(--text-faint, #888888);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 3px;
 }
 
 .mtt-tooltip .mtt-orig-sep {
-  border-top: 1px dashed var(--background-modifier-border, #444);
+  border-top: 1px dashed var(--background-modifier-border, #444444);
   margin-bottom: 5px;
 }
 
 .mtt-tooltip .mtt-orig-preview {
-  color: var(--text-muted, #aaa);
+  color: var(--text-muted, #aaaaaa);
   font-size: 0.9em;
 }
