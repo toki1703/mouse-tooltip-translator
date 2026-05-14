@@ -696,8 +696,7 @@ class TooltipManager {
     }
 
     const key = `v2|${engine}|${sourceLang}|${targetLang}|${text}`;
-    const skipCache = this.plugin.settings.disableCache;
-    const cached = skipCache ? null : this.cacheGet(key);
+    const cached = this.plugin.settings.disableCache ? null : this.cacheGet(key);
     // Sync no-op check on cache hit — avoids flashing the "…" loading state.
     if (cached && isNoopTranslation(cached, text, this.plugin.settings)) {
       this.hide();
