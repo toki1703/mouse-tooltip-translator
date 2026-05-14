@@ -25,6 +25,9 @@ const DEFAULT_SETTINGS = {
   skipIdenticalText: false,
   // When true, always call the translation API and never read from in-memory cache.
   disableCache: false,
+  // When true and page translation is showing, hover shows the pre-translation text
+  // of the paragraph instead of running the normal word/sentence tooltip.
+  pageTranslationHoverOriginal: true,
   // LLM engine settings
   openaiCompatApiUrl: 'https://api.openai.com',
   openaiCompatApiKey: '',
@@ -52,6 +55,15 @@ function isInNoteContent(node) {
   const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
   if (!el) return false;
   return !!el.closest(NOTE_CONTENT_SELECTOR);
+}
+
+// Extracts the pre-translation text stored in data-mtt-orig (which is raw innerHTML).
+function getOriginalText(el) {
+  const orig = el.getAttribute('data-mtt-orig');
+  if (!orig) return null;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = orig;
+  return tmp.textContent.trim() || null;
 }
 
 // A "no-op translation" is one we don't want to display. Each check is gated
@@ -682,6 +694,32 @@ class TooltipManager {
     this.token++;
     if (this.el) this.el.style.display = 'none';
   }
+  // Show plain text (no translation API call) — used when hovering over a
+  // page-translated paragraph to display the pre-translation original.
+  showPlain(text, rect) {
+    if (!text) { this.hide(); return; }
+    if (text === this.lastText && this.el && this.el.style.display !== 'none') {
+      this.position(rect);
+      return;
+    }
+    this.lastText = text;
+    this.token++;
+    const el = this.ensure();
+    el.empty ? el.empty() : (el.textContent = '');
+    const label = document.createElement('div');
+    label.className = 'mtt-orig-label';
+    label.textContent = '原文:';
+    el.appendChild(label);
+    const sep = document.createElement('div');
+    sep.className = 'mtt-orig-sep';
+    el.appendChild(sep);
+    const main = document.createElement('div');
+    main.className = 'mtt-target mtt-orig-preview';
+    main.textContent = text;
+    el.appendChild(main);
+    el.style.display = 'block';
+    this.position(rect);
+  }
   isOwn(target) {
     return !!(this.el && target instanceof Node && this.el.contains(target));
   }
@@ -1273,6 +1311,26 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (this.selectionActive) return;
 
     const x = e.clientX, y = e.clientY;
+
+    // Page-translation hover mode: show pre-translation original of the hovered paragraph.
+    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) {
+      this.pendingTimer = window.setTimeout(() => {
+        this.pendingTimer = null;
+        if (this.selectionActive) return;
+        const target = document.elementFromPoint(x, y);
+        const block = target?.closest('[data-mtt-orig]');
+        if (block) {
+          const origText = getOriginalText(block);
+          if (origText) {
+            this.tooltip.showPlain(origText, block.getBoundingClientRect());
+            return;
+          }
+        }
+        this.tooltip.hide();
+      }, Math.max(0, this.settings.delayMs | 0));
+      return;
+    }
+
     this.pendingTimer = window.setTimeout(() => {
       this.pendingTimer = null;
       // Re-check: a drag-selection may have started during the hover delay.
@@ -1285,6 +1343,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
   onMouseUp(_e) {
     if (!this.settings.enabled) return;
+    // While page-translation hover mode is active, suppress selection-based translation
+    // (selected text would be translated text, not original).
+    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
     const mode = this.settings.triggerMode;
     if (mode === 'mouseover') return;
     // Scope is judged from the selection itself (anchorNode), not from where the mouse
@@ -1302,6 +1363,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
   onSelectionChange() {
     if (!this.settings.enabled) return;
+    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
     if (this.settings.triggerMode === 'mouseover') return;
     const sel = window.getSelection();
     const hasSelection = !!(sel && !sel.isCollapsed && sel.toString().trim());
@@ -1470,6 +1532,20 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         ta.inputEl.style.fontSize = '12px';
       });
     }
+
+    // ---- Page translation options ----
+    containerEl.createEl('h3', { text: 'ページ翻訳' });
+
+    new Setting(containerEl)
+      .setName('翻訳表示中は段落原文をホバー表示')
+      .setDesc('ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.pageTranslationHoverOriginal)
+        .onChange(async (v) => {
+          this.plugin.settings.pageTranslationHoverOriginal = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
 
     new Setting(containerEl)
       .setName('Translate from')

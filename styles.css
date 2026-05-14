@@ -271,3 +271,22 @@
 .mtt-page-btn.is-active {
   color: var(--interactive-accent) !important;
 }
+
+/* ── Page-translation hover: original text preview ──────────── */
+.mtt-tooltip .mtt-orig-label {
+  font-size: 0.78em;
+  color: var(--text-faint, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+.mtt-tooltip .mtt-orig-sep {
+  border-top: 1px dashed var(--background-modifier-border, #444);
+  margin-bottom: 5px;
+}
+
+.mtt-tooltip .mtt-orig-preview {
+  color: var(--text-muted, #aaa);
+  font-size: 0.9em;
+}
