@@ -20,6 +20,8 @@
 > [日本語版 README はこちら](README.ja.md)
 
 ---
+<img alt="Screenshot" src="Shot.jpg">
+<center>Screenshot</center>
 
 ## Three Key Strengths
 
@@ -38,7 +40,7 @@ Every lookup is automatically accumulated in a sidebar vocabulary book. Sort by 
 
 ---
 
-## What's New in v1.3.1
+## What's New in v1.3.8
 
 - **Enhanced page translation**: Added reverse-lookup feature — hover over a translated paragraph to see the original text in a tooltip
 - **LLM support**: Local AI translation via Ollama / LM Studio, and support for OpenAI-compatible APIs
