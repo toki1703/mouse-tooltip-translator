@@ -1430,7 +1430,26 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   onTouchEnd(e) {
     if (!this.settings.enabled) return;
     if (this.tooltip.isOwn(e.target)) return;
-    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
+
+    // Page-translation tap mode: show pre-translation original of the tapped paragraph.
+    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) {
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const x = touch.clientX, y = touch.clientY;
+      setTimeout(() => {
+        const target = document.elementFromPoint(x, y);
+        const block = target?.closest('[data-mtt-orig]');
+        if (block) {
+          const origText = getOriginalText(block);
+          if (origText) {
+            this.tooltip.showPlain(origText, block.getBoundingClientRect());
+            return;
+          }
+        }
+        this.tooltip.hide();
+      }, 100);
+      return;
+    }
 
     // Delay to let the browser finalize selection state after touch
     setTimeout(() => {
