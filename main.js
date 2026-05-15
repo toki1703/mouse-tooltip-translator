@@ -7,7 +7,9 @@ const DEFAULT_SETTINGS = {
   pageEngine: 'google',
   sourceLang: 'auto',
   targetLang: 'ja',
-  triggerMode: 'mouseoverselect', // 'mouseover' | 'select' | 'mouseoverselect'
+  enableHover: true,
+  enableSelection: true,
+  enablePage: true,
   textType: 'word',               // 'word' | 'sentence'
   delayMs: 500,
   showSourceText: false,
@@ -1195,6 +1197,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
     this.addRibbonIcon('book-open', '単語帳を開く', () => this.openVocabView());
     this.addRibbonIcon('languages', 'ページを翻訳 / 元に戻す', () => {
+      if (!this.settings.enablePage) { new Notice('ページ翻訳は無効になっています。'); return; }
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1294,6 +1297,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (!view || typeof view.addAction !== 'function') return;
     if (view.containerEl?.querySelector('.mtt-page-btn')) return;
     const btn = view.addAction('languages', 'ページを翻訳 / 元に戻す', () => {
+      if (!this.settings.enablePage) { new Notice('ページ翻訳は無効になっています。'); return; }
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1337,8 +1341,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     }
     if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
 
-    const mode = this.settings.triggerMode;
-    if (mode === 'select') return; // selection only
+    if (!this.settings.enableHover) return;
     // While a selection is active, freeze the tooltip on the selection translation.
     if (this.selectionActive) return;
 
@@ -1378,8 +1381,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     // While page-translation hover mode is active, suppress selection-based translation
     // (selected text would be translated text, not original).
     if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
-    const mode = this.settings.triggerMode;
-    if (mode === 'mouseover') return;
+    if (!this.settings.enableSelection) return;
     // Scope is judged from the selection itself (anchorNode), not from where the mouse
     // was released — a fast drag can land the cursor outside note content even when
     // the selection is entirely inside it.
@@ -1397,7 +1399,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   onSelectionChange() {
     if (!this.settings.enabled) return;
     if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
-    if (this.settings.triggerMode === 'mouseover') return;
+    if (!this.settings.enableSelection) return;
     const sel = window.getSelection();
     const hasSelection = !!(sel && !sel.isCollapsed && sel.toString().trim());
     if (hasSelection) {
@@ -1502,6 +1504,7 @@ class MouseTooltipSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Mouse Tooltip Translator' });
 
+    // ---- Master Toggle ----
     new Setting(containerEl)
       .setName('Enabled')
       .setDesc('Master switch for the translator.')
@@ -1521,28 +1524,80 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.display();
         }));
 
-    if (this.plugin.settings.restrictToNoteContent) {
-      new Setting(containerEl)
-        .setName('適用するモード')
-        .setDesc('ツールチップ翻訳を有効にするObsidianのビューモードを選択します。')
-        .addDropdown((d) => d
-          .addOption('both', '編集モード + リーディングモード')
-          .addOption('edit', '編集モードのみ')
-          .addOption('reading', 'リーディングモードのみ')
-          .setValue(this.plugin.settings.activeMode || 'both')
-          .onChange(async (v) => {
-            this.plugin.settings.activeMode = v;
-            await this.plugin.saveSettings();
-            this.plugin.tooltip.hide();
-          }));
-    }
+    // ---- 機能の有効化/無効化 ----
+    containerEl.createEl('h3', { text: '機能の有効化/無効化' });
 
-    // ---- Per-context engine selection ----
+    new Setting(containerEl)
+      .setName('ホバー翻訳')
+      .setDesc('マウスカーソルを合わせたときに翻訳ツールチップを表示します。')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enableHover)
+        .onChange(async (v) => { this.plugin.settings.enableHover = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName('テキスト選択翻訳')
+      .setDesc('テキストを選択したときに翻訳ツールチップを表示します。')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enableSelection)
+        .onChange(async (v) => { this.plugin.settings.enableSelection = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName('ページ翻訳')
+      .setDesc('リボンボタンやコマンドからページ全体を翻訳する機能を有効にします。')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enablePage)
+        .onChange(async (v) => { this.plugin.settings.enablePage = v; await this.plugin.saveSettings(); }));
+
+    // ---- 翻訳設定 ----
+    containerEl.createEl('h3', { text: '翻訳設定' });
+
+    new Setting(containerEl)
+      .setName('Translate from')
+      .addDropdown((d) => {
+        for (const [k, v] of Object.entries(COMMON_LANGS)) d.addOption(k, v);
+        d.setValue(this.plugin.settings.sourceLang)
+          .onChange(async (v) => { this.plugin.settings.sourceLang = v; await this.plugin.saveSettings(); });
+      });
+
+    new Setting(containerEl)
+      .setName('Translate to')
+      .addDropdown((d) => {
+        for (const [k, v] of Object.entries(COMMON_LANGS)) {
+          if (k === 'auto') continue;
+          d.addOption(k, v);
+        }
+        d.setValue(this.plugin.settings.targetLang)
+          .onChange(async (v) => { this.plugin.settings.targetLang = v; await this.plugin.saveSettings(); });
+      });
+
+    new Setting(containerEl)
+      .setName('Skip same-language translations')
+      .setDesc('Hide the tooltip when the detected source language matches the target language (e.g. Japanese → Japanese).')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.skipSameLanguage)
+        .onChange(async (v) => {
+          this.plugin.settings.skipSameLanguage = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
+
+    new Setting(containerEl)
+      .setName('Skip identical translations')
+      .setDesc('Also hide the tooltip when the translated text is identical to the source text. Useful for short tokens, proper nouns, or code.')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.skipIdenticalText)
+        .onChange(async (v) => {
+          this.plugin.settings.skipIdenticalText = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
+
+    // ---- エンジン設定 ----
     containerEl.createEl('h3', { text: 'エンジン設定' });
 
     const engineConfigs = [
       { key: 'mouseoverEngine', name: 'ホバー翻訳エンジン', desc: 'マウスカーソルを合わせたときに使うエンジン' },
-      { key: 'selectionEngine', name: 'テキスト選択エンジン', desc: 'テキストを選択したときに使うエンジン' },
+      { key: 'selectionEngine', name: 'テキスト翻訳エンジン', desc: 'テキストを選択したときに使うエンジン' },
       { key: 'pageEngine',      name: 'ページ翻訳エンジン',   desc: 'ページ全体を翻訳するときに使うエンジン' },
     ];
     for (const { key, name, desc } of engineConfigs) {
@@ -1560,13 +1615,13 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         });
     }
 
-    // ---- LLM engine settings (shown once per unique LLM engine in use) ----
+    // LLM engine settings (shown once per unique LLM engine in use)
     const usedLLMs = [...new Set(
       [this.plugin.settings.mouseoverEngine, this.plugin.settings.selectionEngine, this.plugin.settings.pageEngine]
         .filter(e => LLM_ENGINE_KEYS.has(e))
     )];
     for (const eng of usedLLMs) {
-      containerEl.createEl('h3', { text: eng === 'openaiCompat' ? 'OpenAI互換API設定'
+      containerEl.createEl('h4', { text: eng === 'openaiCompat' ? 'OpenAI互換API設定'
         : eng === 'ollama' ? 'Ollama設定' : 'LM Studio設定' });
 
       new Setting(containerEl)
@@ -1634,48 +1689,26 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       });
     }
 
-    // ---- Page translation options ----
-    containerEl.createEl('h3', { text: 'ページ翻訳' });
+    // ---- 機能ごとの設定 ----
+    containerEl.createEl('h3', { text: '機能ごとの設定' });
 
-    new Setting(containerEl)
-      .setName('翻訳表示中は段落原文をホバー表示')
-      .setDesc('ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。')
-      .addToggle((t) => t
-        .setValue(this.plugin.settings.pageTranslationHoverOriginal)
-        .onChange(async (v) => {
-          this.plugin.settings.pageTranslationHoverOriginal = v;
-          await this.plugin.saveSettings();
-          this.plugin.tooltip.hide();
-        }));
+    containerEl.createEl('h4', { text: 'ホバー翻訳 / テキスト選択翻訳' });
 
-    new Setting(containerEl)
-      .setName('Translate from')
-      .addDropdown((d) => {
-        for (const [k, v] of Object.entries(COMMON_LANGS)) d.addOption(k, v);
-        d.setValue(this.plugin.settings.sourceLang)
-          .onChange(async (v) => { this.plugin.settings.sourceLang = v; await this.plugin.saveSettings(); });
-      });
-
-    new Setting(containerEl)
-      .setName('Translate to')
-      .addDropdown((d) => {
-        for (const [k, v] of Object.entries(COMMON_LANGS)) {
-          if (k === 'auto') continue;
-          d.addOption(k, v);
-        }
-        d.setValue(this.plugin.settings.targetLang)
-          .onChange(async (v) => { this.plugin.settings.targetLang = v; await this.plugin.saveSettings(); });
-      });
-
-    new Setting(containerEl)
-      .setName('Trigger')
-      .setDesc('How a translation is triggered.')
-      .addDropdown((d) => d
-        .addOption('mouseover', 'Mouseover')
-        .addOption('select', 'Selection')
-        .addOption('mouseoverselect', 'Mouseover + Selection')
-        .setValue(this.plugin.settings.triggerMode)
-        .onChange(async (v) => { this.plugin.settings.triggerMode = v; await this.plugin.saveSettings(); }));
+    if (this.plugin.settings.restrictToNoteContent) {
+      new Setting(containerEl)
+        .setName('適用するモード')
+        .setDesc('ツールチップ翻訳を有効にするObsidianのビューモードを選択します。')
+        .addDropdown((d) => d
+          .addOption('both', '編集モード + リーディングモード')
+          .addOption('edit', '編集モードのみ')
+          .addOption('reading', 'リーディングモードのみ')
+          .setValue(this.plugin.settings.activeMode || 'both')
+          .onChange(async (v) => {
+            this.plugin.settings.activeMode = v;
+            await this.plugin.saveSettings();
+            this.plugin.tooltip.hide();
+          }));
+    }
 
     new Setting(containerEl)
       .setName('Mouseover unit')
@@ -1699,6 +1732,22 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
+    containerEl.createEl('h4', { text: 'ページ翻訳' });
+
+    new Setting(containerEl)
+      .setName('翻訳表示中は段落原文をホバー表示')
+      .setDesc('ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。')
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.pageTranslationHoverOriginal)
+        .onChange(async (v) => {
+          this.plugin.settings.pageTranslationHoverOriginal = v;
+          await this.plugin.saveSettings();
+          this.plugin.tooltip.hide();
+        }));
+
+    // ---- ツールチップ Contents ----
+    containerEl.createEl('h3', { text: 'ツールチップ Contents' });
+
     new Setting(containerEl)
       .setName('Show dictionary (POS) for single words')
       .setDesc('When Google returns a bilingual dictionary, show "noun: ..." / "verb: ..." lines instead of the plain translation. Other engines do not return POS info.')
@@ -1714,7 +1763,7 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         .onChange(async (v) => { this.plugin.settings.showTransliteration = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Show source text in tooltip')
+      .setName('Show source text')
       .addToggle((t) => t
         .setValue(this.plugin.settings.showSourceText)
         .onChange(async (v) => { this.plugin.settings.showSourceText = v; await this.plugin.saveSettings(); }));
@@ -1724,38 +1773,5 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .addToggle((t) => t
         .setValue(this.plugin.settings.showDetectedLang)
         .onChange(async (v) => { this.plugin.settings.showDetectedLang = v; await this.plugin.saveSettings(); }));
-
-    new Setting(containerEl)
-      .setName('Skip same-language translations')
-      .setDesc('Hide the tooltip when the detected source language matches the target language (e.g. Japanese → Japanese). Relies on the engine\'s language detection.')
-      .addToggle((t) => t
-        .setValue(this.plugin.settings.skipSameLanguage)
-        .onChange(async (v) => {
-          this.plugin.settings.skipSameLanguage = v;
-          await this.plugin.saveSettings();
-          this.plugin.tooltip.hide();
-        }));
-
-    new Setting(containerEl)
-      .setName('Skip identical translations (strict)')
-      .setDesc('Also hide the tooltip when the translated text is identical to the source text. Useful when language detection is wrong on short tokens, proper nouns, or code.')
-      .addToggle((t) => t
-        .setValue(this.plugin.settings.skipIdenticalText)
-        .onChange(async (v) => {
-          this.plugin.settings.skipIdenticalText = v;
-          await this.plugin.saveSettings();
-          this.plugin.tooltip.hide();
-        }));
-
-    new Setting(containerEl)
-      .setName('Disable translation cache')
-      .setDesc('Always call the translation API on every hover, ignoring the in-memory cache. Useful when you want fresh results each time.')
-      .addToggle((t) => t
-        .setValue(this.plugin.settings.disableCache)
-        .onChange(async (v) => {
-          this.plugin.settings.disableCache = v;
-          await this.plugin.saveSettings();
-          this.plugin.tooltip.hide();
-        }));
   }
 }
