@@ -1,4 +1,4 @@
-const { Plugin, PluginSettingTab, Setting, Notice, requestUrl, ItemView } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, Notice, requestUrl, ItemView, Platform } = require('obsidian');
 const nodeCrypto = require('crypto');
 
 const DEFAULT_SETTINGS = {
@@ -1233,12 +1233,6 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     addButtons();
     this.registerEvent(this.app.workspace.on('layout-change', addButtons));
 
-    this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
-    this.registerDomEvent(document, 'mouseleave', () => {
-      // keep tooltip while a selection is locking it
-      if (this.selectionActive) return;
-      this.tooltip.hide();
-    });
     this.registerDomEvent(document, 'keydown', (e) => {
       if (e.key === 'Escape') {
         this.tooltip.hide();
@@ -1250,11 +1244,25 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       if (this.selectionActive) return;
       this.tooltip.hide();
     }, true);
-    this.registerDomEvent(document, 'mousedown', (e) => {
-      if (!this.tooltip.isOwn(e.target)) this.tooltip.hide();
-    });
-    this.registerDomEvent(document, 'mouseup', (e) => this.onMouseUp(e));
     this.registerDomEvent(document, 'selectionchange', () => this.onSelectionChange());
+
+    if (Platform.isMobile) {
+      this.registerDomEvent(document, 'touchstart', (e) => {
+        if (!this.tooltip.isOwn(e.target)) this.tooltip.hide();
+      });
+      this.registerDomEvent(document, 'touchend', (e) => this.onTouchEnd(e));
+    } else {
+      this.registerDomEvent(document, 'mousemove', (e) => this.onMouseMove(e));
+      this.registerDomEvent(document, 'mouseleave', () => {
+        // keep tooltip while a selection is locking it
+        if (this.selectionActive) return;
+        this.tooltip.hide();
+      });
+      this.registerDomEvent(document, 'mousedown', (e) => {
+        if (!this.tooltip.isOwn(e.target)) this.tooltip.hide();
+      });
+      this.registerDomEvent(document, 'mouseup', (e) => this.onMouseUp(e));
+    }
 
     console.log('[mouse-tooltip-translator] loaded');
   }
@@ -1391,6 +1399,36 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     } catch { rect = null; }
     if (!rect) return;
     this.tooltip.show(text, rect, this.settings.selectionEngine);
+  }
+
+  onTouchEnd(e) {
+    if (!this.settings.enabled) return;
+    if (this.tooltip.isOwn(e.target)) return;
+    if (this.settings.pageTranslationHoverOriginal && this.pageTranslator.hasTranslation()) return;
+
+    // Delay to let the browser finalize selection state after touch
+    setTimeout(() => {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) {
+        if (this.settings.restrictToNoteContent
+            && !isInNoteContent(sel.anchorNode)
+            && !isInNoteContent(sel.focusNode)) return;
+        this.translateSelection();
+        return;
+      }
+      // No selection: try word at touch point
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const x = touch.clientX, y = touch.clientY;
+      if (this.settings.restrictToNoteContent) {
+        const el = document.elementFromPoint(x, y);
+        if (el && !isInNoteContent(el)) return;
+      }
+      const hit = extractAtPoint(x, y, 'word');
+      if (hit) {
+        this.tooltip.show(hit.text, hit.rect, this.settings.selectionEngine);
+      }
+    }, 100);
   }
 
   async loadSettings() {
