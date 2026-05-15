@@ -4,14 +4,14 @@
 > A translation plugin for Obsidian that completes your reading and learning with just a mouse hover.
 
 <div align="center">
-<a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/" style="text-decoration: none">
-<img alt="Mouse Tooltip Translator downloads - latest release" src="https://img.shields.io/badge/dynamic/json?query=%24%5B%22obsidian-mouse-tooltip-translator%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json&label=Downloads:&logo=obsidian&color=8c79de&logoColor=8c79de">
+<a href="https://github.com/toki1703/mouse-tooltip-translator/" style="text-decoration: none">
+<img alt="Mouse Tooltip Translator downloads - latest release" src="https://img.shields.io/badge/dynamic/json?query=%24%5B%22mouse-tooltip-translator%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json&label=Downloads:&logo=obsidian&color=8c79de&logoColor=8c79de">
 </a>
-<a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/stargazers" style="text-decoration: none">
-<img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/toki1703/obsidian-mouse-tooltip-translator?color=yellow&label=Stargazers%3A&logo=OpenTelemetry&logoColor=yellow">
+<a href="https://github.com/toki1703/mouse-tooltip-translator/stargazers" style="text-decoration: none">
+<img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/toki1703/mouse-tooltip-translator?color=yellow&label=Stargazers%3A&logo=OpenTelemetry&logoColor=yellow">
 </a>
-<a href="https://github.com/toki1703/obsidian-mouse-tooltip-translator/releases/latest" style="text-decoration: none">
-<img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/toki1703/obsidian-mouse-tooltip-translator?color=%234e96af&display_name=tag&include_prereleases&label=Latest%20release%3A&logo=Dropbox&logoColor=%236abdd9">
+<a href="https://github.com/toki1703/mouse-tooltip-translator/releases/latest" style="text-decoration: none">
+<img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/toki1703/mouse-tooltip-translator?color=%234e96af&display_name=tag&include_prereleases&label=Latest%20release%3A&logo=Dropbox&logoColor=%236abdd9">
 </a>
 </div>
 
@@ -167,7 +167,7 @@ Go to Obsidian Settings → Community plugins → Browse, search for `Mouse Tool
 2. Place them in:
 
    ```
-   <your vault>/.obsidian/plugins/obsidian-mouse-tooltip-translator/
+   <your vault>/.obsidian/plugins/mouse-tooltip-translator/
    ```
 
 3. Restart Obsidian or reload the plugin
