@@ -1508,10 +1508,10 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   }
 
   _addPageTranslateButton(view) {
+    if (!this.settings.enablePage) return;
     if (!view || typeof view.addAction !== 'function') return;
     if (view.containerEl?.querySelector('.mtt-page-btn')) return;
     const btn = view.addAction('languages', i18n().ribbonPage, () => {
-      if (!this.settings.enablePage) { new Notice(i18n().pageDisabled); return; }
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1765,6 +1765,11 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.settings.enablePage = v;
           await this.plugin.saveSettings();
           if (this.plugin.ribbonPageEl) this.plugin.ribbonPageEl.style.display = v ? '' : 'none';
+          if (v) {
+            this.plugin.app.workspace.getLeavesOfType('markdown').forEach(leaf => this.plugin._addPageTranslateButton(leaf.view));
+          } else {
+            document.querySelectorAll('.mtt-page-btn').forEach(el => el.remove());
+          }
         }));
 
     // ---- Translation ----
