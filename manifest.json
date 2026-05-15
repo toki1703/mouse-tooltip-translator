@@ -1,7 +1,7 @@
 {
 	"id": "mouse-tooltip-translator",
 	"name": "Mouse Tooltip Translator",
-	"version": "1.3.5",
+	"version": "1.3.6",
 	"minAppVersion": "1.12.0",
 	"description": "Inspired by 'Mouse Tooltip Translator' Chrome extension. Hover to translate.",
 	"author": "ときくん",
