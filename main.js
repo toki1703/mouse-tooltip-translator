@@ -856,9 +856,20 @@ class TooltipManager {
     const w = this.el.offsetWidth || 200;
     const h = this.el.offsetHeight || 30;
     let x = rect.left;
-    let y = rect.bottom + pad;
-    if (y + h > window.innerHeight) y = rect.top - h - pad;
+    let y;
+    if (Platform.isMobile) {
+      // Upper half → show above finger; lower half → show below finger
+      if (rect.top < window.innerHeight / 2) {
+        y = rect.top - h - pad;
+      } else {
+        y = rect.bottom + pad;
+      }
+    } else {
+      y = rect.bottom + pad;
+      if (y + h > window.innerHeight) y = rect.top - h - pad;
+    }
     if (y < 0) y = pad;
+    if (y + h > window.innerHeight) y = window.innerHeight - h - pad;
     if (x + w > window.innerWidth) x = window.innerWidth - w - pad;
     if (x < 0) x = pad;
     this.el.style.left = `${x}px`;
