@@ -10,6 +10,9 @@ const DEFAULT_SETTINGS = {
   enableHover: true,
   enableSelection: true,
   enablePage: true,
+  enableHoverMobile: true,
+  enableSelectionMobile: true,
+  enablePageMobile: true,
   textType: 'word',               // 'word' | 'sentence'
   delayMs: 500,
   showSourceText: false,
@@ -86,6 +89,8 @@ const STRINGS = {
     // Settings headings
     settingsTitle: 'Mouse Tooltip Translator',
     secFeatures: 'Features',
+    secDesktop: 'Desktop',
+    secMobile: 'Mobile',
     secTranslation: 'Translation',
     secEngines: 'Engine Settings',
     secPerFeature: '🎯Per-feature Settings',
@@ -104,6 +109,12 @@ const STRINGS = {
     featSelectionDesc: 'Show a translation tooltip when text is selected.',
     featPage: 'Page translation',
     featPageDesc: 'Enable full-page translation via the ribbon button or command.',
+    featHoverMobile: 'Tap translation',
+    featHoverMobileDesc: 'Show a translation tooltip when tapping on a word.',
+    featSelectionMobile: 'Selection translation',
+    featSelectionMobileDesc: 'Show a translation tooltip when text is selected after a touch.',
+    featPageMobile: 'Page translation',
+    featPageMobileDesc: 'Enable full-page translation via the ribbon button or command.',
     // Translation settings
     translateFrom: 'Translate from',
     translateTo: 'Translate to',
@@ -188,6 +199,8 @@ const STRINGS = {
     ribbonVocab: '単語帳を開く',
     ribbonPage: 'ページを翻訳 / 元に戻す',
     secFeatures: '機能の有効化/無効化',
+    secDesktop: 'デスクトップ',
+    secMobile: 'モバイル',
     secTranslation: '翻訳設定',
     secEngines: 'エンジン設定',
     secPerFeature: '🎯機能ごとの設定',
@@ -200,6 +213,12 @@ const STRINGS = {
     featSelectionDesc: 'テキストを選択したときに翻訳ツールチップを表示します。',
     featPage: 'ページ翻訳',
     featPageDesc: 'リボンボタンやコマンドからページ全体を翻訳する機能を有効にします。',
+    featHoverMobile: 'タップ翻訳',
+    featHoverMobileDesc: '単語をタップしたときに翻訳ツールチップを表示します。',
+    featSelectionMobile: 'テキスト選択翻訳',
+    featSelectionMobileDesc: 'タッチ後にテキストを選択したときに翻訳ツールチップを表示します。',
+    featPageMobile: 'ページ翻訳',
+    featPageMobileDesc: 'リボンボタンやコマンドからページ全体を翻訳する機能を有効にします。',
     skipSameDesc: '翻訳先と同じ言語が検出された場合にツールチップを非表示にします。',
     skipIdenticalDesc: '翻訳結果が原文と同一の場合もツールチップを非表示にします。短いトークン、固有名詞、コードなどに有効です。',
     engineHover: 'ホバー翻訳エンジン',
@@ -1419,7 +1438,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
         this.pageTranslator.translatePage();
       }
     });
-    if (!this.settings.enablePage) this.ribbonPageEl.style.display = 'none';
+    if (!(Platform.isMobile ? this.settings.enablePageMobile : this.settings.enablePage)) this.ribbonPageEl.style.display = 'none';
 
     this.addCommand({
       id: 'mtt-open-vocab',
@@ -1508,7 +1527,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   }
 
   _addPageTranslateButton(view) {
-    if (!this.settings.enablePage) return;
+    if (!(Platform.isMobile ? this.settings.enablePageMobile : this.settings.enablePage)) return;
     if (!view || typeof view.addAction !== 'function') return;
     if (view.containerEl?.querySelector('.mtt-page-btn')) return;
     const btn = view.addAction('languages', i18n().ribbonPage, () => {
@@ -1671,6 +1690,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     setTimeout(() => {
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed && sel.toString().trim()) {
+        if (!this.settings.enableSelectionMobile) return;
         if (this.settings.restrictToNoteContent) {
           const _sel = this._noteContentSelector();
           if (!isInNoteContent(sel.anchorNode, _sel) && !isInNoteContent(sel.focusNode, _sel)) return;
@@ -1679,6 +1699,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
         return;
       }
       // No selection: try word at touch point
+      if (!this.settings.enableHoverMobile) return;
       const touch = e.changedTouches[0];
       if (!touch) return;
       const x = touch.clientX, y = touch.clientY;
@@ -1742,6 +1763,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
     // ---- Features ----
     containerEl.createEl('h3', { text: s.secFeatures });
 
+    containerEl.createEl('h4', { text: s.secDesktop });
+
     new Setting(containerEl)
       .setName(s.featHover)
       .setDesc(s.featHoverDesc)
@@ -1764,11 +1787,47 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         .onChange(async (v) => {
           this.plugin.settings.enablePage = v;
           await this.plugin.saveSettings();
-          if (this.plugin.ribbonPageEl) this.plugin.ribbonPageEl.style.display = v ? '' : 'none';
-          if (v) {
-            this.plugin.app.workspace.getLeavesOfType('markdown').forEach(leaf => this.plugin._addPageTranslateButton(leaf.view));
-          } else {
-            document.querySelectorAll('.mtt-page-btn').forEach(el => el.remove());
+          if (!Platform.isMobile) {
+            if (this.plugin.ribbonPageEl) this.plugin.ribbonPageEl.style.display = v ? '' : 'none';
+            if (v) {
+              this.plugin.app.workspace.getLeavesOfType('markdown').forEach(leaf => this.plugin._addPageTranslateButton(leaf.view));
+            } else {
+              document.querySelectorAll('.mtt-page-btn').forEach(el => el.remove());
+            }
+          }
+        }));
+
+    containerEl.createEl('h4', { text: s.secMobile });
+
+    new Setting(containerEl)
+      .setName(s.featHoverMobile)
+      .setDesc(s.featHoverMobileDesc)
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enableHoverMobile)
+        .onChange(async (v) => { this.plugin.settings.enableHoverMobile = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName(s.featSelectionMobile)
+      .setDesc(s.featSelectionMobileDesc)
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enableSelectionMobile)
+        .onChange(async (v) => { this.plugin.settings.enableSelectionMobile = v; await this.plugin.saveSettings(); }));
+
+    new Setting(containerEl)
+      .setName(s.featPageMobile)
+      .setDesc(s.featPageMobileDesc)
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.enablePageMobile)
+        .onChange(async (v) => {
+          this.plugin.settings.enablePageMobile = v;
+          await this.plugin.saveSettings();
+          if (Platform.isMobile) {
+            if (this.plugin.ribbonPageEl) this.plugin.ribbonPageEl.style.display = v ? '' : 'none';
+            if (v) {
+              this.plugin.app.workspace.getLeavesOfType('markdown').forEach(leaf => this.plugin._addPageTranslateButton(leaf.view));
+            } else {
+              document.querySelectorAll('.mtt-page-btn').forEach(el => el.remove());
+            }
           }
         }));
 
