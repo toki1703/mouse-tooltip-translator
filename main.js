@@ -51,6 +51,194 @@ const DEFAULT_SETTINGS = {
   lmstudioTemperature: 0,
 };
 
+// ── i18n ─────────────────────────────────────────────────────────────────────
+const STRINGS = {
+  en: {
+    // Tooltip
+    origLabel: 'Original:',
+    noTranslation: '(no translation)',
+    // Vocab view
+    vocabTitle: 'Vocabulary',
+    vocabReload: 'Reload',
+    sortByCount: 'By view count',
+    sortByRecent: 'Recently viewed',
+    sortAlpha: 'Alphabetical',
+    filterAll: 'All',
+    filterWord: 'Word',
+    filterSentence: 'Sentence',
+    vocabEmpty: 'No translation history',
+    // Page translator
+    pageAlreadyRunning: 'Page translation is already running.',
+    pageNeedReadingView: 'Please switch to Reading View to translate the page.',
+    pageNoText: 'No text found to translate.',
+    pageTranslating: (cur, tot) => `Translating... ${cur}/${tot}`,
+    pageCancel: 'Cancel',
+    pageDone: (done, tot) => `Page translation complete (${done}/${tot} sections)`,
+    pageRestoreReadingOnly: 'Page restore is only available in Reading View.',
+    pageNoTranslated: 'No translated text found.',
+    pageRestored: (n) => `Restored original text (${n} sections)`,
+    // Plugin actions
+    pageDisabled: 'Page translation is disabled.',
+    pluginToggle: (on) => `Mouse Tooltip Translator: ${on ? 'ON' : 'OFF'}`,
+    // Ribbon / commands
+    ribbonVocab: 'Open vocabulary list',
+    ribbonPage: 'Translate page / Restore',
+    // Settings headings
+    settingsTitle: 'Mouse Tooltip Translator',
+    secFeatures: 'Features',
+    secTranslation: 'Translation',
+    secEngines: 'Engine Settings',
+    secPerFeature: 'Per-feature Settings',
+    secHoverSelection: 'Hover / Text Selection',
+    secPage: 'Page Translation',
+    secTooltip: 'Tooltip Contents',
+    // Master toggle
+    masterEnabled: 'Enabled',
+    masterEnabledDesc: 'Master switch for the translator.',
+    masterRestrict: 'Restrict to note content',
+    masterRestrictDesc: 'Only react inside the note body (editor, preview, embeds). Turn off to translate anywhere in the Obsidian UI — sidebars, headings, settings, etc.',
+    // Feature toggles
+    featHover: 'Hover translation',
+    featHoverDesc: 'Show a translation tooltip when hovering over text.',
+    featSelection: 'Text selection translation',
+    featSelectionDesc: 'Show a translation tooltip when text is selected.',
+    featPage: 'Page translation',
+    featPageDesc: 'Enable full-page translation via the ribbon button or command.',
+    // Translation settings
+    translateFrom: 'Translate from',
+    translateTo: 'Translate to',
+    skipSame: 'Skip same-language translations',
+    skipSameDesc: "Hide the tooltip when the detected source language matches the target language (e.g. Japanese → Japanese).",
+    skipIdentical: 'Skip identical translations',
+    skipIdenticalDesc: 'Also hide the tooltip when the translated text is identical to the source text. Useful for short tokens, proper nouns, or code.',
+    // Engine settings
+    engineHover: 'Hover translation engine',
+    engineHoverDesc: 'Engine to use when hovering.',
+    engineSelection: 'Text translation engine',
+    engineSelectionDesc: 'Engine to use for text selection.',
+    enginePage: 'Page translation engine',
+    enginePageDesc: 'Engine to use for full-page translation.',
+    // LLM subsections
+    llmOpenai: 'OpenAI-compatible API',
+    llmOllama: 'Ollama',
+    llmLmstudio: 'LM Studio',
+    llmApiUrl: 'API URL',
+    llmApiUrlDescOpenai: 'Base URL (e.g. https://api.openai.com)',
+    llmApiUrlDescOllama: 'Ollama base URL (default: http://localhost:11434)',
+    llmApiUrlDescLmstudio: 'LM Studio base URL (default: http://localhost:1234)',
+    llmApiKey: 'API Key',
+    llmModel: 'Model',
+    llmModelDescOpenai: 'e.g. gpt-4o-mini, gpt-4o',
+    llmModelDescOllama: 'e.g. llama3, mistral, gemma3',
+    llmModelDescLmstudio: 'e.g. llama-3.2-3b-instruct',
+    llmTemp: 'Temperature',
+    llmTempDesc: 'Generation randomness. 0 = deterministic, 2 = maximum. Default: 0.0',
+    llmPrompt: 'Prompt template',
+    llmPromptDesc: 'Leave blank to use the default prompt. {{text}} is replaced with the source text, {{targetLang}} with the target language name.',
+    // Per-feature settings
+    activeMode: 'Active mode',
+    activeModeDesc: 'Select which Obsidian view mode to enable tooltip translation in.',
+    modeBoth: 'Edit + Reading',
+    modeEdit: 'Edit only',
+    modeReading: 'Reading only',
+    mouseUnit: 'Mouseover unit',
+    mouseUnitDesc: 'Word picks one word under the cursor. Sentence expands to sentence boundary.',
+    hoverDelay: 'Hover delay (ms)',
+    hoverDelayDesc: 'Wait time before the tooltip is requested.',
+    pageHoverOrig: 'Show original paragraph on hover during page translation',
+    pageHoverOrigDesc: 'While page translation is active, disable normal hover/selection translation and show the pre-translation text of the hovered paragraph instead.',
+    // Engine dropdown labels (for LLM engines)
+    engOpenaiCompat: 'OpenAI Compatible API',
+    engOllama: 'Ollama (local)',
+    engLmstudio: 'LM Studio (local)',
+    // Errors
+    llmModelRequired: 'Model name is required. Please enter it in the plugin settings.',
+    // Tooltip contents
+    showDict: 'Show dictionary (POS) for single words',
+    showDictDesc: 'When Google returns a bilingual dictionary, show "noun: ..." / "verb: ..." lines instead of the plain translation. Other engines do not return POS info.',
+    showTranslit: 'Show transliteration (romanization)',
+    showTranslitDesc: 'Display the romanized reading of the source word (Google / Bing only).',
+    showSource: 'Show source text',
+    showDetected: 'Show detected language',
+  },
+  ja: {
+    origLabel: '原文:',
+    noTranslation: '(翻訳なし)',
+    vocabTitle: '単語帳',
+    vocabReload: '再読み込み',
+    sortByCount: '閲覧数順',
+    sortByRecent: '最近見た順',
+    sortAlpha: 'アルファベット順',
+    filterAll: 'すべて',
+    filterWord: '単語',
+    filterSentence: '文',
+    vocabEmpty: '翻訳履歴がありません',
+    pageAlreadyRunning: 'ページ翻訳は既に実行中です。',
+    pageNeedReadingView: 'ページ翻訳には閲覧モード（Reading View）に切り替えてください。',
+    pageNoText: '翻訳するテキストが見つかりませんでした。',
+    pageTranslating: (cur, tot) => `ページ翻訳中... ${cur}/${tot}`,
+    pageCancel: 'キャンセル',
+    pageDone: (done, tot) => `ページ翻訳完了 (${done}/${tot} セクション)`,
+    pageRestoreReadingOnly: '閲覧モードでのみ復元できます。',
+    pageNoTranslated: '翻訳済みのテキストが見つかりませんでした。',
+    pageRestored: (n) => `元のテキストに復元しました (${n} セクション)`,
+    pageDisabled: 'ページ翻訳は無効になっています。',
+    ribbonVocab: '単語帳を開く',
+    ribbonPage: 'ページを翻訳 / 元に戻す',
+    secFeatures: '機能の有効化/無効化',
+    secTranslation: '翻訳設定',
+    secEngines: 'エンジン設定',
+    secPerFeature: '機能ごとの設定',
+    secHoverSelection: 'ホバー翻訳 / テキスト選択翻訳',
+    secPage: 'ページ翻訳',
+    secTooltip: 'ツールチップ Contents',
+    featHover: 'ホバー翻訳',
+    featHoverDesc: 'マウスカーソルを合わせたときに翻訳ツールチップを表示します。',
+    featSelection: 'テキスト選択翻訳',
+    featSelectionDesc: 'テキストを選択したときに翻訳ツールチップを表示します。',
+    featPage: 'ページ翻訳',
+    featPageDesc: 'リボンボタンやコマンドからページ全体を翻訳する機能を有効にします。',
+    skipSameDesc: '翻訳先と同じ言語が検出された場合にツールチップを非表示にします。',
+    skipIdenticalDesc: '翻訳結果が原文と同一の場合もツールチップを非表示にします。短いトークン、固有名詞、コードなどに有効です。',
+    engineHover: 'ホバー翻訳エンジン',
+    engineHoverDesc: 'マウスカーソルを合わせたときに使うエンジン',
+    engineSelection: 'テキスト翻訳エンジン',
+    engineSelectionDesc: 'テキストを選択したときに使うエンジン',
+    enginePage: 'ページ翻訳エンジン',
+    enginePageDesc: 'ページ全体を翻訳するときに使うエンジン',
+    llmOpenai: 'OpenAI互換API設定',
+    llmOllama: 'Ollama設定',
+    llmLmstudio: 'LM Studio設定',
+    llmApiUrlDescOpenai: 'ベースURL（例: https://api.openai.com）',
+    llmApiUrlDescOllama: 'OllamaのベースURL（デフォルト: http://localhost:11434）',
+    llmApiUrlDescLmstudio: 'LM StudioのベースURL（デフォルト: http://localhost:1234）',
+    llmModelDescOpenai: '例: gpt-4o-mini, gpt-4o',
+    llmModelDescOllama: '例: llama3, mistral, gemma3',
+    llmModelDescLmstudio: '例: llama-3.2-3b-instruct',
+    llmTempDesc: '生成のランダム性。0 = 決定論的、2 = 最大ランダム。既定値: 0.0',
+    llmPrompt: 'プロンプトテンプレート',
+    llmPromptDesc: '空欄の場合はデフォルトのプロンプトを使用。{{text}} に原文、{{targetLang}} に翻訳先言語名が挿入されます。',
+    activeMode: '適用するモード',
+    activeModeDesc: 'ツールチップ翻訳を有効にするObsidianのビューモードを選択します。',
+    modeBoth: '編集モード + リーディングモード',
+    modeEdit: '編集モードのみ',
+    modeReading: 'リーディングモードのみ',
+    pageHoverOrig: '翻訳表示中は段落原文をホバー表示',
+    pageHoverOrigDesc: 'ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。',
+    engOpenaiCompat: 'OpenAI互換API',
+    engOllama: 'Ollama (ローカル)',
+    engLmstudio: 'LM Studio (ローカル)',
+    llmModelRequired: 'モデル名が未設定です。設定から入力してください。',
+  },
+};
+
+// Returns the merged strings for the current Obsidian locale (falls back to English).
+function i18n() {
+  const loc = (typeof window !== 'undefined' && window.moment?.locale?.()) || 'en';
+  const lang = /^ja/.test(loc) ? 'ja' : 'en';
+  return lang === 'ja' ? { ...STRINGS.en, ...STRINGS.ja } : STRINGS.en;
+}
+
 // Selector for nodes that count as "note content".
 // .cm-content       : CodeMirror 6 editor content (source / live preview)
 // .markdown-preview-view : reading mode container
@@ -456,7 +644,7 @@ class LLMEngine extends BaseTranslator {
   }
 
   static async _chatRequest(text, etgt, { url, model, apiKey, prompt, temperature }) {
-    if (!model) throw new Error('モデル名が未設定です。設定から入力してください。');
+    if (!model) throw new Error(i18n().llmModelRequired);
     const endpoint = `${(url || '').replace(/\/+$/, '')}/v1/chat/completions`;
     const headers = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
@@ -534,9 +722,9 @@ const ENGINE_LABELS = {
   bing: 'Bing (experimental)',
   yandex: 'Yandex (experimental)',
   papago: 'Papago (experimental)',
-  openaiCompat: 'OpenAI互換API',
-  ollama: 'Ollama (ローカル)',
-  lmstudio: 'LM Studio (ローカル)',
+  openaiCompat: 'OpenAI Compatible API',
+  ollama: 'Ollama (local)',
+  lmstudio: 'LM Studio (local)',
 };
 
 const LLM_ENGINE_KEYS = new Set(['openaiCompat', 'ollama', 'lmstudio']);
@@ -715,7 +903,7 @@ class TooltipManager {
     el.empty ? el.empty() : (el.textContent = '');
     const label = document.createElement('div');
     label.className = 'mtt-orig-label';
-    label.textContent = '原文:';
+    label.textContent = i18n().origLabel;
     el.appendChild(label);
     const sep = document.createElement('div');
     sep.className = 'mtt-orig-sep';
@@ -790,7 +978,7 @@ class TooltipManager {
     }
     if (my !== this.token) return;
     if (!result || !result.targetText) {
-      el.textContent = '(no translation)';
+      el.textContent = i18n().noTranslation;
       el.style.display = 'block';
       this.position(rect);
       return;
@@ -897,7 +1085,7 @@ class VocabView extends ItemView {
   }
 
   getViewType() { return VOCAB_VIEW_TYPE; }
-  getDisplayText() { return '単語帳'; }
+  getDisplayText() { return i18n().vocabTitle; }
   getIcon() { return 'book-open'; }
 
   async onOpen() { this.render(); }
@@ -908,8 +1096,9 @@ class VocabView extends ItemView {
     root.addClass('mtt-vocab-root');
 
     const header = root.createEl('div', { cls: 'mtt-vocab-header' });
-    header.createEl('span', { cls: 'mtt-vocab-title', text: '単語帳' });
-    const reload = header.createEl('button', { cls: 'mtt-vocab-reload', title: '再読み込み' });
+    const s = i18n();
+    header.createEl('span', { cls: 'mtt-vocab-title', text: s.vocabTitle });
+    const reload = header.createEl('button', { cls: 'mtt-vocab-reload', title: s.vocabReload });
     reload.textContent = '↻';
     reload.addEventListener('click', () => this.refresh());
 
@@ -917,9 +1106,9 @@ class VocabView extends ItemView {
 
     const sortSelect = controls.createEl('select', { cls: 'mtt-vocab-sort' });
     for (const [value, label] of [
-      ['count-desc', '閲覧数順'],
-      ['last-desc', '最近見た順'],
-      ['alpha', 'アルファベット順'],
+      ['count-desc', s.sortByCount],
+      ['last-desc', s.sortByRecent],
+      ['alpha', s.sortAlpha],
     ]) {
       const opt = sortSelect.createEl('option', { text: label });
       opt.value = value;
@@ -928,7 +1117,7 @@ class VocabView extends ItemView {
     sortSelect.addEventListener('change', () => { this._sort = sortSelect.value; this.refresh(); });
 
     const filterWrap = controls.createEl('div', { cls: 'mtt-vocab-filter-wrap' });
-    for (const [value, label] of [['all', 'すべて'], ['word', '単語'], ['sentence', '文']]) {
+    for (const [value, label] of [['all', s.filterAll], ['word', s.filterWord], ['sentence', s.filterSentence]]) {
       const btn = filterWrap.createEl('button', { cls: 'mtt-vocab-filter-btn', text: label });
       btn.dataset.filter = value;
       if (value === this._filter) btn.addClass('is-active');
@@ -964,7 +1153,7 @@ class VocabView extends ItemView {
     else sorted.sort((a, b) => a.sourceText.localeCompare(b.sourceText));
 
     if (sorted.length === 0) {
-      container.createEl('div', { cls: 'mtt-vocab-empty', text: '翻訳履歴がありません' });
+      container.createEl('div', { cls: 'mtt-vocab-empty', text: i18n().vocabEmpty });
       return;
     }
 
@@ -1041,7 +1230,7 @@ class PageTranslator {
       el.className = 'mtt-page-progress';
       el.innerHTML = `<span class="mtt-page-progress-label"></span>` +
         `<div class="mtt-page-progress-bar-wrap"><div class="mtt-page-progress-bar"></div></div>` +
-        `<button class="mtt-page-progress-cancel" aria-label="キャンセル">✕</button>`;
+        `<button class="mtt-page-progress-cancel" aria-label="${i18n().pageCancel}">✕</button>`;
       el.querySelector('.mtt-page-progress-cancel').onclick = () => this.cancel();
       document.body.appendChild(el);
       this._progressEl = el;
@@ -1049,7 +1238,7 @@ class PageTranslator {
     }
     const pct = total > 0 ? Math.round(current / total * 100) : 0;
     this._progressEl.querySelector('.mtt-page-progress-label').textContent =
-      `ページ翻訳中... ${current}/${total}`;
+      i18n().pageTranslating(current, total);
     this._progressEl.querySelector('.mtt-page-progress-bar').style.width = `${pct}%`;
   }
 
@@ -1095,17 +1284,17 @@ class PageTranslator {
 
   async translatePage() {
     if (this._running) {
-      new Notice('ページ翻訳は既に実行中です');
+      new Notice(i18n().pageAlreadyRunning);
       return;
     }
     const container = this._getContainer();
     if (!container) {
-      new Notice('ページ翻訳には閲覧モード（Reading View）に切り替えてください');
+      new Notice(i18n().pageNeedReadingView);
       return;
     }
     const blocks = this._getBlocks(container);
     if (blocks.length === 0) {
-      new Notice('翻訳するテキストが見つかりませんでした');
+      new Notice(i18n().pageNoText);
       return;
     }
 
@@ -1153,19 +1342,19 @@ class PageTranslator {
     this._syncButton(activeView);
 
     if (!this._cancelled) {
-      new Notice(`ページ翻訳完了 (${done}/${blocks.length} セクション)`);
+      new Notice(i18n().pageDone(done, blocks.length));
     }
   }
 
   restorePage() {
     const container = this._getContainer();
     if (!container) {
-      new Notice('閲覧モードでのみ復元できます');
+      new Notice(i18n().pageRestoreReadingOnly);
       return;
     }
     const translated = container.querySelectorAll('[data-mtt-orig]');
     if (translated.length === 0) {
-      new Notice('翻訳済みのテキストが見つかりませんでした');
+      new Notice(i18n().pageNoTranslated);
       return;
     }
     translated.forEach(el => {
@@ -1174,7 +1363,7 @@ class PageTranslator {
       el.classList.remove('mtt-page-translated');
     });
     this._syncButton(this.plugin.app.workspace.activeLeaf?.view);
-    new Notice(`元のテキストに復元しました (${translated.length} セクション)`);
+    new Notice(i18n().pageRestored(translated.length));
   }
 }
 
@@ -1195,9 +1384,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
 
     this.registerView(VOCAB_VIEW_TYPE, (leaf) => new VocabView(leaf, this));
 
-    this.addRibbonIcon('book-open', '単語帳を開く', () => this.openVocabView());
-    this.addRibbonIcon('languages', 'ページを翻訳 / 元に戻す', () => {
-      if (!this.settings.enablePage) { new Notice('ページ翻訳は無効になっています。'); return; }
+    this.addRibbonIcon('book-open', i18n().ribbonVocab, () => this.openVocabView());
+    this.addRibbonIcon('languages', i18n().ribbonPage, () => {
+      if (!this.settings.enablePage) { new Notice(i18n().pageDisabled); return; }
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1223,7 +1412,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       callback: async () => {
         this.settings.enabled = !this.settings.enabled;
         await this.saveSettings();
-        new Notice(`Mouse Tooltip Translator: ${this.settings.enabled ? 'ON' : 'OFF'}`);
+        new Notice(i18n().pluginToggle(this.settings.enabled));
         if (!this.settings.enabled) this.tooltip.hide();
       },
     });
@@ -1296,8 +1485,8 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   _addPageTranslateButton(view) {
     if (!view || typeof view.addAction !== 'function') return;
     if (view.containerEl?.querySelector('.mtt-page-btn')) return;
-    const btn = view.addAction('languages', 'ページを翻訳 / 元に戻す', () => {
-      if (!this.settings.enablePage) { new Notice('ページ翻訳は無効になっています。'); return; }
+    const btn = view.addAction('languages', i18n().ribbonPage, () => {
+      if (!this.settings.enablePage) { new Notice(i18n().pageDisabled); return; }
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1502,19 +1691,20 @@ class MouseTooltipSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl('h2', { text: 'Mouse Tooltip Translator' });
+    const s = i18n();
+    containerEl.createEl('h2', { text: s.settingsTitle });
 
     // ---- Master Toggle ----
     new Setting(containerEl)
-      .setName('Enabled')
-      .setDesc('Master switch for the translator.')
+      .setName(s.masterEnabled)
+      .setDesc(s.masterEnabledDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.enabled)
         .onChange(async (v) => { this.plugin.settings.enabled = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Restrict to note content')
-      .setDesc('Only react inside the note body (editor, preview, embeds). Turn off to translate anywhere in the Obsidian UI — sidebars, headings, settings, etc.')
+      .setName(s.masterRestrict)
+      .setDesc(s.masterRestrictDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.restrictToNoteContent)
         .onChange(async (v) => {
@@ -1524,35 +1714,35 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.display();
         }));
 
-    // ---- 機能の有効化/無効化 ----
-    containerEl.createEl('h3', { text: '機能の有効化/無効化' });
+    // ---- Features ----
+    containerEl.createEl('h3', { text: s.secFeatures });
 
     new Setting(containerEl)
-      .setName('ホバー翻訳')
-      .setDesc('マウスカーソルを合わせたときに翻訳ツールチップを表示します。')
+      .setName(s.featHover)
+      .setDesc(s.featHoverDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.enableHover)
         .onChange(async (v) => { this.plugin.settings.enableHover = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('テキスト選択翻訳')
-      .setDesc('テキストを選択したときに翻訳ツールチップを表示します。')
+      .setName(s.featSelection)
+      .setDesc(s.featSelectionDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.enableSelection)
         .onChange(async (v) => { this.plugin.settings.enableSelection = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('ページ翻訳')
-      .setDesc('リボンボタンやコマンドからページ全体を翻訳する機能を有効にします。')
+      .setName(s.featPage)
+      .setDesc(s.featPageDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.enablePage)
         .onChange(async (v) => { this.plugin.settings.enablePage = v; await this.plugin.saveSettings(); }));
 
-    // ---- 翻訳設定 ----
-    containerEl.createEl('h3', { text: '翻訳設定' });
+    // ---- Translation ----
+    containerEl.createEl('h3', { text: s.secTranslation });
 
     new Setting(containerEl)
-      .setName('Translate from')
+      .setName(s.translateFrom)
       .addDropdown((d) => {
         for (const [k, v] of Object.entries(COMMON_LANGS)) d.addOption(k, v);
         d.setValue(this.plugin.settings.sourceLang)
@@ -1560,7 +1750,7 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Translate to')
+      .setName(s.translateTo)
       .addDropdown((d) => {
         for (const [k, v] of Object.entries(COMMON_LANGS)) {
           if (k === 'auto') continue;
@@ -1571,8 +1761,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
-      .setName('Skip same-language translations')
-      .setDesc('Hide the tooltip when the detected source language matches the target language (e.g. Japanese → Japanese).')
+      .setName(s.skipSame)
+      .setDesc(s.skipSameDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.skipSameLanguage)
         .onChange(async (v) => {
@@ -1582,8 +1772,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Skip identical translations')
-      .setDesc('Also hide the tooltip when the translated text is identical to the source text. Useful for short tokens, proper nouns, or code.')
+      .setName(s.skipIdentical)
+      .setDesc(s.skipIdenticalDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.skipIdenticalText)
         .onChange(async (v) => {
@@ -1592,20 +1782,21 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.tooltip.hide();
         }));
 
-    // ---- エンジン設定 ----
-    containerEl.createEl('h3', { text: 'エンジン設定' });
+    // ---- Engine Settings ----
+    containerEl.createEl('h3', { text: s.secEngines });
 
     const engineConfigs = [
-      { key: 'mouseoverEngine', name: 'ホバー翻訳エンジン', desc: 'マウスカーソルを合わせたときに使うエンジン' },
-      { key: 'selectionEngine', name: 'テキスト翻訳エンジン', desc: 'テキストを選択したときに使うエンジン' },
-      { key: 'pageEngine',      name: 'ページ翻訳エンジン',   desc: 'ページ全体を翻訳するときに使うエンジン' },
+      { key: 'mouseoverEngine', name: s.engineHover,     desc: s.engineHoverDesc },
+      { key: 'selectionEngine', name: s.engineSelection, desc: s.engineSelectionDesc },
+      { key: 'pageEngine',      name: s.enginePage,      desc: s.enginePageDesc },
     ];
+    const llmEngineLabels = { openaiCompat: s.engOpenaiCompat, ollama: s.engOllama, lmstudio: s.engLmstudio };
     for (const { key, name, desc } of engineConfigs) {
       new Setting(containerEl)
         .setName(name)
         .setDesc(desc)
         .addDropdown((d) => {
-          for (const [k, v] of Object.entries(ENGINES)) d.addOption(k, v.label);
+          for (const [k, v] of Object.entries(ENGINES)) d.addOption(k, llmEngineLabels[k] ?? v.label);
           d.setValue(this.plugin.settings[key] || 'google')
             .onChange(async (v) => {
               this.plugin.settings[key] = v;
@@ -1621,16 +1812,13 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         .filter(e => LLM_ENGINE_KEYS.has(e))
     )];
     for (const eng of usedLLMs) {
-      containerEl.createEl('h4', { text: eng === 'openaiCompat' ? 'OpenAI互換API設定'
-        : eng === 'ollama' ? 'Ollama設定' : 'LM Studio設定' });
+      containerEl.createEl('h4', { text: eng === 'openaiCompat' ? s.llmOpenai
+        : eng === 'ollama' ? s.llmOllama : s.llmLmstudio });
 
       new Setting(containerEl)
-        .setName('API URL')
-        .setDesc(eng === 'openaiCompat'
-          ? 'ベースURL（例: https://api.openai.com）'
-          : eng === 'ollama'
-            ? 'OllamaのベースURL（デフォルト: http://localhost:11434）'
-            : 'LM StudioのベースURL（デフォルト: http://localhost:1234）')
+        .setName(s.llmApiUrl)
+        .setDesc(eng === 'openaiCompat' ? s.llmApiUrlDescOpenai
+          : eng === 'ollama' ? s.llmApiUrlDescOllama : s.llmApiUrlDescLmstudio)
         .addText((t) => {
           const urlKey = eng === 'openaiCompat' ? 'openaiCompatApiUrl'
             : eng === 'ollama' ? 'ollamaApiUrl' : 'lmstudioApiUrl';
@@ -1642,7 +1830,7 @@ class MouseTooltipSettingTab extends PluginSettingTab {
 
       if (eng === 'openaiCompat') {
         new Setting(containerEl)
-          .setName('API Key')
+          .setName(s.llmApiKey)
           .addText((t) => t
             .setPlaceholder('sk-...')
             .setValue(this.plugin.settings.openaiCompatApiKey || '')
@@ -1650,10 +1838,9 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       }
 
       new Setting(containerEl)
-        .setName('Model')
-        .setDesc(eng === 'openaiCompat' ? '例: gpt-4o-mini, gpt-4o'
-          : eng === 'ollama' ? '例: llama3, mistral, gemma3'
-          : '例: llama-3.2-3b-instruct')
+        .setName(s.llmModel)
+        .setDesc(eng === 'openaiCompat' ? s.llmModelDescOpenai
+          : eng === 'ollama' ? s.llmModelDescOllama : s.llmModelDescLmstudio)
         .addText((t) => {
           const modelKey = eng === 'openaiCompat' ? 'openaiCompatModel'
             : eng === 'ollama' ? 'ollamaModel' : 'lmstudioModel';
@@ -1665,9 +1852,9 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       const tempKey = eng === 'openaiCompat' ? 'openaiCompatTemperature'
         : eng === 'ollama' ? 'ollamaTemperature' : 'lmstudioTemperature';
       new Setting(containerEl)
-        .setName('Temperature')
-        .setDesc('生成のランダム性。0 = 決定論的、2 = 最大ランダム。既定値: 0.0')
-        .addSlider((s) => s
+        .setName(s.llmTemp)
+        .setDesc(s.llmTempDesc)
+        .addSlider((sl) => sl
           .setLimits(0, 2, 0.1)
           .setValue(this.plugin.settings[tempKey] ?? 0)
           .setDynamicTooltip()
@@ -1676,8 +1863,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       const promptKey = eng === 'openaiCompat' ? 'openaiCompatPrompt'
         : eng === 'ollama' ? 'ollamaPrompt' : 'lmstudioPrompt';
       const promptSetting = new Setting(containerEl)
-        .setName('プロンプトテンプレート')
-        .setDesc('空欄の場合はデフォルトのプロンプトを使用。{{text}} に原文、{{targetLang}} に翻訳先言語名が挿入されます。');
+        .setName(s.llmPrompt)
+        .setDesc(s.llmPromptDesc);
       promptSetting.addTextArea((ta) => {
         ta.setPlaceholder('Translate the following text to {{targetLang}}. Output only the translated text, nothing else.\n\n{{text}}')
           .setValue(this.plugin.settings[promptKey] || '')
@@ -1689,19 +1876,19 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       });
     }
 
-    // ---- 機能ごとの設定 ----
-    containerEl.createEl('h3', { text: '機能ごとの設定' });
+    // ---- Per-feature Settings ----
+    containerEl.createEl('h3', { text: s.secPerFeature });
 
-    containerEl.createEl('h4', { text: 'ホバー翻訳 / テキスト選択翻訳' });
+    containerEl.createEl('h4', { text: s.secHoverSelection });
 
     if (this.plugin.settings.restrictToNoteContent) {
       new Setting(containerEl)
-        .setName('適用するモード')
-        .setDesc('ツールチップ翻訳を有効にするObsidianのビューモードを選択します。')
+        .setName(s.activeMode)
+        .setDesc(s.activeModeDesc)
         .addDropdown((d) => d
-          .addOption('both', '編集モード + リーディングモード')
-          .addOption('edit', '編集モードのみ')
-          .addOption('reading', 'リーディングモードのみ')
+          .addOption('both', s.modeBoth)
+          .addOption('edit', s.modeEdit)
+          .addOption('reading', s.modeReading)
           .setValue(this.plugin.settings.activeMode || 'both')
           .onChange(async (v) => {
             this.plugin.settings.activeMode = v;
@@ -1711,8 +1898,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
     }
 
     new Setting(containerEl)
-      .setName('Mouseover unit')
-      .setDesc('Word picks one word under the cursor. Sentence expands to sentence boundary.')
+      .setName(s.mouseUnit)
+      .setDesc(s.mouseUnitDesc)
       .addDropdown((d) => d
         .addOption('word', 'Word')
         .addOption('sentence', 'Sentence')
@@ -1720,8 +1907,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
         .onChange(async (v) => { this.plugin.settings.textType = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Hover delay (ms)')
-      .setDesc('Wait time before the tooltip is requested.')
+      .setName(s.hoverDelay)
+      .setDesc(s.hoverDelayDesc)
       .addText((t) => t
         .setPlaceholder('500')
         .setValue(String(this.plugin.settings.delayMs))
@@ -1732,11 +1919,11 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }));
 
-    containerEl.createEl('h4', { text: 'ページ翻訳' });
+    containerEl.createEl('h4', { text: s.secPage });
 
     new Setting(containerEl)
-      .setName('翻訳表示中は段落原文をホバー表示')
-      .setDesc('ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。')
+      .setName(s.pageHoverOrig)
+      .setDesc(s.pageHoverOrigDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.pageTranslationHoverOriginal)
         .onChange(async (v) => {
@@ -1745,31 +1932,31 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.tooltip.hide();
         }));
 
-    // ---- ツールチップ Contents ----
-    containerEl.createEl('h3', { text: 'ツールチップ Contents' });
+    // ---- Tooltip Contents ----
+    containerEl.createEl('h3', { text: s.secTooltip });
 
     new Setting(containerEl)
-      .setName('Show dictionary (POS) for single words')
-      .setDesc('When Google returns a bilingual dictionary, show "noun: ..." / "verb: ..." lines instead of the plain translation. Other engines do not return POS info.')
+      .setName(s.showDict)
+      .setDesc(s.showDictDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.showDictionary)
         .onChange(async (v) => { this.plugin.settings.showDictionary = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Show transliteration (romanization)')
-      .setDesc('Display the romanized reading of the source word (Google / Bing only).')
+      .setName(s.showTranslit)
+      .setDesc(s.showTranslitDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.showTransliteration)
         .onChange(async (v) => { this.plugin.settings.showTransliteration = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Show source text')
+      .setName(s.showSource)
       .addToggle((t) => t
         .setValue(this.plugin.settings.showSourceText)
         .onChange(async (v) => { this.plugin.settings.showSourceText = v; await this.plugin.saveSettings(); }));
 
     new Setting(containerEl)
-      .setName('Show detected language')
+      .setName(s.showDetected)
       .addToggle((t) => t
         .setValue(this.plugin.settings.showDetectedLang)
         .onChange(async (v) => { this.plugin.settings.showDetectedLang = v; await this.plugin.saveSettings(); }));
