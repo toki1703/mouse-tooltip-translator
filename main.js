@@ -88,7 +88,7 @@ const STRINGS = {
     secFeatures: 'Features',
     secTranslation: 'Translation',
     secEngines: 'Engine Settings',
-    secPerFeature: 'Per-feature Settings',
+    secPerFeature: '🎯Per-feature Settings',
     secHoverSelection: 'Hover / Text Selection',
     secPage: 'Page Translation',
     secTooltip: 'Tooltip Contents',
@@ -156,6 +156,8 @@ const STRINGS = {
     // Tooltip contents
     showDict: 'Show dictionary (POS) for single words',
     showDictDesc: 'When Google returns a bilingual dictionary, show "noun: ..." / "verb: ..." lines instead of the plain translation. Other engines do not return POS info.',
+    unitWord: 'Word',
+    unitSentence: 'Sentence',
     showTranslit: 'Show transliteration (romanization)',
     showTranslitDesc: 'Display the romanized reading of the source word (Google / Bing only).',
     showSource: 'Show source text',
@@ -188,7 +190,7 @@ const STRINGS = {
     secFeatures: '機能の有効化/無効化',
     secTranslation: '翻訳設定',
     secEngines: 'エンジン設定',
-    secPerFeature: '機能ごとの設定',
+    secPerFeature: '🎯機能ごとの設定',
     secHoverSelection: 'ホバー翻訳 / テキスト選択翻訳',
     secPage: 'ページ翻訳',
     secTooltip: 'ツールチップ Contents',
@@ -229,6 +231,29 @@ const STRINGS = {
     engOllama: 'Ollama (ローカル)',
     engLmstudio: 'LM Studio (ローカル)',
     llmModelRequired: 'モデル名が未設定です。設定から入力してください。',
+    masterEnabled: '有効',
+    masterEnabledDesc: '翻訳機能のマスタースイッチ。',
+    masterRestrict: 'ノートコンテンツ内に制限',
+    masterRestrictDesc: 'ノート本文（エディター・プレビュー・埋め込み）内でのみ反応します。オフにすると、サイドバーや見出し、設定など Obsidian UI 全体で翻訳します。',
+    translateFrom: '翻訳元言語',
+    translateTo: '翻訳先言語',
+    skipSame: '同一言語の翻訳をスキップ',
+    skipSameDesc: '翻訳先と同じ言語が検出された場合にツールチップを非表示にします（例: 日本語 → 日本語）。',
+    skipIdentical: '同一テキストの翻訳をスキップ',
+    skipIdenticalDesc: '翻訳結果が原文と同一の場合もツールチップを非表示にします。短いトークン、固有名詞、コードなどに有効です。',
+    unitWord: '単語',
+    unitSentence: '文',
+    mouseUnit: 'ホバー単位',
+    mouseUnitDesc: '「単語」はカーソル直下の1語を取得します。「文」は文境界まで展開します。',
+    hoverDelay: 'ホバー遅延 (ms)',
+    hoverDelayDesc: 'ツールチップを表示するまでの待機時間。',
+    secTooltip: 'ツールチップの内容',
+    showDict: '単語の品詞（辞書）情報を表示',
+    showDictDesc: 'Google が二言語辞書を返した場合、単純な翻訳の代わりに「名詞: ...」/「動詞: ...」形式で表示します。他のエンジンは品詞情報を返しません。',
+    showTranslit: '転写（ローマ字読み）を表示',
+    showTranslitDesc: '原語のローマ字読みを表示します（Google・Bing のみ）。',
+    showSource: '原文を表示',
+    showDetected: '検出言語を表示',
   },
 };
 
@@ -1901,8 +1926,8 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .setName(s.mouseUnit)
       .setDesc(s.mouseUnitDesc)
       .addDropdown((d) => d
-        .addOption('word', 'Word')
-        .addOption('sentence', 'Sentence')
+        .addOption('word', s.unitWord)
+        .addOption('sentence', s.unitSentence)
         .setValue(this.plugin.settings.textType)
         .onChange(async (v) => { this.plugin.settings.textType = v; await this.plugin.saveSettings(); }));
 
