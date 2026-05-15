@@ -1410,8 +1410,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     this.registerView(VOCAB_VIEW_TYPE, (leaf) => new VocabView(leaf, this));
 
     this.addRibbonIcon('book-open', i18n().ribbonVocab, () => this.openVocabView());
-    this.addRibbonIcon('languages', i18n().ribbonPage, () => {
-      if (!this.settings.enablePage) { new Notice(i18n().pageDisabled); return; }
+    this.ribbonPageEl = this.addRibbonIcon('languages', i18n().ribbonPage, () => {
       if (this.pageTranslator._running) {
         this.pageTranslator.cancel();
       } else if (this.pageTranslator.hasTranslation()) {
@@ -1420,6 +1419,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
         this.pageTranslator.translatePage();
       }
     });
+    if (!this.settings.enablePage) this.ribbonPageEl.style.display = 'none';
 
     this.addCommand({
       id: 'mtt-open-vocab',
@@ -1761,7 +1761,11 @@ class MouseTooltipSettingTab extends PluginSettingTab {
       .setDesc(s.featPageDesc)
       .addToggle((t) => t
         .setValue(this.plugin.settings.enablePage)
-        .onChange(async (v) => { this.plugin.settings.enablePage = v; await this.plugin.saveSettings(); }));
+        .onChange(async (v) => {
+          this.plugin.settings.enablePage = v;
+          await this.plugin.saveSettings();
+          if (this.plugin.ribbonPageEl) this.plugin.ribbonPageEl.style.display = v ? '' : 'none';
+        }));
 
     // ---- Translation ----
     containerEl.createEl('h3', { text: s.secTranslation });
