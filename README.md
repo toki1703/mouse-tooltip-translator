@@ -12,7 +12,7 @@
 </a>
 <a href="https://github.com/toki1703/mouse-tooltip-translator/releases/latest" style="text-decoration: none">
 <img alt="GitHub release (latest by date including pre-releases)" src="https://img.shields.io/github/v/release/toki1703/mouse-tooltip-translator?color=%234e96af&display_name=tag&include_prereleases&label=Latest%20release%3A&logo=Dropbox&logoColor=%236abdd9">
-</a>
+</a>  
 </div>
 
 ---
@@ -20,6 +20,8 @@
 > [日本語版 README はこちら](README.ja.md)
 
 ---
+<img alt="Screenshot" src="Shot.jpg">
+<center>Screenshot</center>
 
 ## Three Key Strengths
 
