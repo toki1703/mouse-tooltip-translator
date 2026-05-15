@@ -1042,7 +1042,7 @@ class PageTranslator {
     if (headerEl) {
       const rect = headerEl.getBoundingClientRect();
       Object.assign(this._progressEl.style, {
-        top: `${rect.bottom + 4}px`,
+        top: `${rect.bottom - 26}px`,
         left: `${rect.left + 8}px`,
         bottom: 'auto',
         transform: 'none',
