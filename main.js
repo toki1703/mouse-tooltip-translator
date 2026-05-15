@@ -18,6 +18,11 @@ const DEFAULT_SETTINGS = {
   // When true, only react inside Obsidian note content (editor / preview / rendered embeds).
   // When false, react across the entire UI (sidebars, headers, etc.) — original behavior.
   restrictToNoteContent: true,
+  // Which Obsidian view modes to react in (requires restrictToNoteContent: true).
+  // 'edit'    : editor only (source / live preview)
+  // 'reading' : reading view only
+  // 'both'    : both (default)
+  activeMode: 'both',
   // Suppress the tooltip when detected source language equals the target language.
   skipSameLanguage: true,
   // Stricter fallback: suppress when the translated text is identical to the input.
@@ -50,11 +55,11 @@ const DEFAULT_SETTINGS = {
 // .markdown-rendered     : rendered markdown anywhere (embeds, hover preview, etc.)
 const NOTE_CONTENT_SELECTOR = '.cm-content, .markdown-preview-view, .markdown-rendered';
 
-function isInNoteContent(node) {
+function isInNoteContent(node, selector) {
   if (!node) return false;
   const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
   if (!el) return false;
-  return !!el.closest(NOTE_CONTENT_SELECTOR);
+  return !!el.closest(selector || NOTE_CONTENT_SELECTOR);
 }
 
 // Extracts the pre-translation text stored in data-mtt-orig (which is raw innerHTML).
@@ -1303,10 +1308,18 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     }
   }
 
+  _noteContentSelector() {
+    switch (this.settings.activeMode) {
+      case 'edit':    return '.cm-content, .markdown-rendered';
+      case 'reading': return '.markdown-preview-view, .markdown-rendered';
+      default:        return NOTE_CONTENT_SELECTOR;
+    }
+  }
+
   onMouseMove(e) {
     if (!this.settings.enabled) return;
     if (this.tooltip.isOwn(e.target)) return;
-    if (this.settings.restrictToNoteContent && !isInNoteContent(e.target)) {
+    if (this.settings.restrictToNoteContent && !isInNoteContent(e.target, this._noteContentSelector())) {
       if (this.pendingTimer) { clearTimeout(this.pendingTimer); this.pendingTimer = null; }
       if (!this.selectionActive) this.tooltip.hide();
       return;
@@ -1363,7 +1376,8 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       if (this.settings.restrictToNoteContent) {
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed) return;
-        if (!isInNoteContent(sel.anchorNode) && !isInNoteContent(sel.focusNode)) return;
+        const _sel = this._noteContentSelector();
+        if (!isInNoteContent(sel.anchorNode, _sel) && !isInNoteContent(sel.focusNode, _sel)) return;
       }
       this.translateSelection();
     }, 0);
@@ -1376,9 +1390,10 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     const sel = window.getSelection();
     const hasSelection = !!(sel && !sel.isCollapsed && sel.toString().trim());
     if (hasSelection) {
-      if (this.settings.restrictToNoteContent
-          && !isInNoteContent(sel.anchorNode)
-          && !isInNoteContent(sel.focusNode)) return;
+      if (this.settings.restrictToNoteContent) {
+        const _sel = this._noteContentSelector();
+        if (!isInNoteContent(sel.anchorNode, _sel) && !isInNoteContent(sel.focusNode, _sel)) return;
+      }
       // Lock onto the selection — mousemove follow is suspended.
       this.selectionActive = true;
     } else if (this.selectionActive) {
@@ -1410,9 +1425,10 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     setTimeout(() => {
       const sel = window.getSelection();
       if (sel && !sel.isCollapsed && sel.toString().trim()) {
-        if (this.settings.restrictToNoteContent
-            && !isInNoteContent(sel.anchorNode)
-            && !isInNoteContent(sel.focusNode)) return;
+        if (this.settings.restrictToNoteContent) {
+          const _sel = this._noteContentSelector();
+          if (!isInNoteContent(sel.anchorNode, _sel) && !isInNoteContent(sel.focusNode, _sel)) return;
+        }
         this.translateSelection();
         return;
       }
@@ -1422,7 +1438,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       const x = touch.clientX, y = touch.clientY;
       if (this.settings.restrictToNoteContent) {
         const el = document.elementFromPoint(x, y);
-        if (el && !isInNoteContent(el)) return;
+        if (el && !isInNoteContent(el, this._noteContentSelector())) return;
       }
       const hit = extractAtPoint(x, y, 'word');
       if (hit) {
@@ -1472,7 +1488,24 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.settings.restrictToNoteContent = v;
           await this.plugin.saveSettings();
           this.plugin.tooltip.hide();
+          this.display();
         }));
+
+    if (this.plugin.settings.restrictToNoteContent) {
+      new Setting(containerEl)
+        .setName('適用するモード')
+        .setDesc('ツールチップ翻訳を有効にするObsidianのビューモードを選択します。')
+        .addDropdown((d) => d
+          .addOption('both', '編集モード + リーディングモード')
+          .addOption('edit', '編集モードのみ')
+          .addOption('reading', 'リーディングモードのみ')
+          .setValue(this.plugin.settings.activeMode || 'both')
+          .onChange(async (v) => {
+            this.plugin.settings.activeMode = v;
+            await this.plugin.saveSettings();
+            this.plugin.tooltip.hide();
+          }));
+    }
 
     // ---- Per-context engine selection ----
     containerEl.createEl('h3', { text: 'エンジン設定' });
