@@ -185,6 +185,28 @@
   white-space: nowrap;
 }
 
+.mtt-vocab-copy {
+  margin-left: auto;
+  padding: 1px 7px;
+  font-size: 0.75em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mtt-vocab-card:hover .mtt-vocab-copy {
+  opacity: 1;
+}
+.mtt-vocab-copy:hover {
+  background: var(--interactive-hover);
+  color: var(--text-normal);
+}
+
 .mtt-vocab-pos-wrap {
   display: flex;
   flex-wrap: wrap;

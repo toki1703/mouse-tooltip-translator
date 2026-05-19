@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS = {
   skipIdenticalText: false,
   // When true, always call the translation API and never read from in-memory cache.
   disableCache: false,
+  // 'system' | 'ja' | 'en'
+  uiLang: 'system',
   // When true and page translation is showing, hover shows the pre-translation text
   // of the paragraph instead of running the normal word/sentence tooltip.
   pageTranslationHoverOriginal: true,
@@ -173,6 +175,9 @@ const STRINGS = {
     showTranslitDesc: 'Display the romanized reading of the source word (Google / Bing only).',
     showSource: 'Show source text',
     showDetected: 'Show detected language',
+    uiLang: 'Interface language',
+    uiLangDesc: 'Language used in the plugin settings UI.',
+    uiLangSystem: 'Follow system',
   },
   ja: {
     origLabel: '原文:',
@@ -273,11 +278,17 @@ const STRINGS = {
     showTranslitDesc: '原語のローマ字読みを表示します（Google・Bing のみ）。',
     showSource: '原文を表示',
     showDetected: '検出言語を表示',
+    uiLang: 'UI言語',
+    uiLangDesc: 'プラグイン設定UIに使用する言語。',
+    uiLangSystem: 'システムに従う',
   },
 };
 
 // Returns the merged strings for the current Obsidian locale (falls back to English).
+let _mttSettings = null;
 function i18n() {
+  if (_mttSettings?.uiLang === 'ja') return { ...STRINGS.en, ...STRINGS.ja };
+  if (_mttSettings?.uiLang === 'en') return STRINGS.en;
   const loc = (typeof window !== 'undefined' && window.moment?.locale?.()) || 'en';
   const lang = /^ja/.test(loc) ? 'ja' : 'en';
   return lang === 'ja' ? { ...STRINGS.en, ...STRINGS.ja } : STRINGS.en;
@@ -1717,6 +1728,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   async loadSettings() {
     const loaded = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+    _mttSettings = this.settings;
     // Migrate old single 'engine' setting to per-context engines
     if (loaded?.engine) {
       if (!loaded.mouseoverEngine) this.settings.mouseoverEngine = loaded.engine;
@@ -1726,6 +1738,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
   }
   async saveSettings() {
     await this.saveData(this.settings);
+    _mttSettings = this.settings;
   }
 };
 
@@ -1739,6 +1752,21 @@ class MouseTooltipSettingTab extends PluginSettingTab {
     containerEl.empty();
     const s = i18n();
     containerEl.createEl('h2', { text: s.settingsTitle });
+
+    // ---- UI Language ----
+    new Setting(containerEl)
+      .setName(s.uiLang)
+      .setDesc(s.uiLangDesc)
+      .addDropdown((d) => d
+        .addOption('system', s.uiLangSystem)
+        .addOption('ja', '日本語')
+        .addOption('en', 'English')
+        .setValue(this.plugin.settings.uiLang)
+        .onChange(async (v) => {
+          this.plugin.settings.uiLang = v;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
 
     // ---- Master Toggle ----
     new Setting(containerEl)
