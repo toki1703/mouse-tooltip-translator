@@ -186,10 +186,11 @@ const STRINGS = {
     // Translation panel
     ribbonTrans: 'Open translation panel',
     transPanelTitle: 'Translation',
-    transPanelWaiting: 'Hover over text to translate…',
+    transPanelPlaceholder: 'Enter text to translate…',
+    transPanelSwap: 'Swap languages',
+    transPanelClear: 'Clear',
     transPanelCopy: 'Copy',
     transPanelCopied: 'Copied!',
-    transPanelSource: 'Original:',
   },
   ja: {
     origLabel: '原文:',
@@ -302,10 +303,11 @@ const STRINGS = {
     // Translation panel
     ribbonTrans: '翻訳パネルを開く',
     transPanelTitle: '翻訳',
-    transPanelWaiting: 'テキストにホバーして翻訳…',
+    transPanelPlaceholder: '翻訳するテキストを入力…',
+    transPanelSwap: '言語を入れ替え',
+    transPanelClear: 'クリア',
     transPanelCopy: 'コピー',
     transPanelCopied: 'コピー済み',
-    transPanelSource: '原文:',
   },
 };
 
@@ -1279,9 +1281,16 @@ class TranslationView extends ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.plugin = plugin;
-    this._currentText = null;
-    this._currentResult = null;
-    this._contentEl = null;
+    this._srcLang = plugin.settings.sourceLang;
+    this._tgtLang = plugin.settings.targetLang;
+    this._result = null;
+    this._debounceTimer = null;
+    this._inputEl = null;
+    this._resultEl = null;
+    this._metaEl = null;
+    this._copyBtn = null;
+    this._srcSelect = null;
+    this._tgtSelect = null;
   }
 
   getViewType() { return TRANS_VIEW_TYPE; }
@@ -1292,44 +1301,146 @@ class TranslationView extends ItemView {
     const root = this.containerEl.children[1];
     root.empty();
     root.addClass('mtt-trans-root');
-    this._contentEl = root.createEl('div', { cls: 'mtt-trans-content' });
-    // Show last translation if one is already available.
-    const last = this.plugin.tooltip?.lastResult;
-    const lastText = this.plugin.tooltip?.lastText;
-    if (last && lastText) {
-      this._currentText = lastText;
-      this._currentResult = last;
-    }
-    this._renderContent();
+    this._build(root);
   }
 
-  update(text, result) {
-    this._currentText = text;
-    this._currentResult = result;
-    if (this._contentEl) this._renderContent();
-  }
-
-  _renderContent() {
-    const el = this._contentEl;
-    if (!el) return;
-    el.empty();
+  _build(root) {
     const s = i18n();
 
-    if (!this._currentResult || !this._currentResult.targetText) {
-      el.createEl('div', { cls: 'mtt-trans-waiting', text: s.transPanelWaiting });
+    // ── Language selector bar ────────────────────────────────────
+    const langBar = root.createEl('div', { cls: 'mtt-trans-lang-bar' });
+
+    this._srcSelect = langBar.createEl('select', { cls: 'mtt-trans-lang-select' });
+    for (const [code, label] of Object.entries(COMMON_LANGS)) {
+      const opt = this._srcSelect.createEl('option', { text: label });
+      opt.value = code;
+      if (code === this._srcLang) opt.selected = true;
+    }
+    this._srcSelect.addEventListener('change', () => {
+      this._srcLang = this._srcSelect.value;
+      this._scheduleTranslate();
+    });
+
+    const swapBtn = langBar.createEl('button', { cls: 'mtt-trans-swap', title: s.transPanelSwap });
+    swapBtn.textContent = '⇄';
+    swapBtn.addEventListener('click', () => this._swapLangs());
+
+    this._tgtSelect = langBar.createEl('select', { cls: 'mtt-trans-lang-select' });
+    for (const [code, label] of Object.entries(COMMON_LANGS)) {
+      if (code === 'auto') continue;
+      const opt = this._tgtSelect.createEl('option', { text: label });
+      opt.value = code;
+      if (code === this._tgtLang) opt.selected = true;
+    }
+    this._tgtSelect.addEventListener('change', () => {
+      this._tgtLang = this._tgtSelect.value;
+      this._scheduleTranslate();
+    });
+
+    // ── Source textarea ──────────────────────────────────────────
+    const inputWrap = root.createEl('div', { cls: 'mtt-trans-input-wrap' });
+    this._inputEl = inputWrap.createEl('textarea', {
+      cls: 'mtt-trans-input',
+      attr: { placeholder: s.transPanelPlaceholder },
+    });
+    this._inputEl.addEventListener('input', () => this._scheduleTranslate());
+
+    const clearBtn = inputWrap.createEl('button', {
+      cls: 'mtt-trans-clear-btn',
+      title: s.transPanelClear,
+      text: '✕',
+    });
+    clearBtn.addEventListener('click', () => {
+      this._inputEl.value = '';
+      this._result = null;
+      this._renderResult();
+    });
+
+    // ── Result area ──────────────────────────────────────────────
+    this._resultEl = root.createEl('div', { cls: 'mtt-trans-result' });
+
+    // ── Footer ───────────────────────────────────────────────────
+    const footer = root.createEl('div', { cls: 'mtt-trans-footer' });
+    this._metaEl = footer.createEl('span', { cls: 'mtt-trans-meta' });
+    this._copyBtn = footer.createEl('button', { cls: 'mtt-trans-copy', text: s.transPanelCopy });
+    this._copyBtn.style.visibility = 'hidden';
+    this._copyBtn.addEventListener('click', async () => {
+      if (!this._result?.targetText) return;
+      await navigator.clipboard.writeText(this._result.targetText);
+      this._copyBtn.textContent = s.transPanelCopied;
+      setTimeout(() => { this._copyBtn.textContent = s.transPanelCopy; }, 1500);
+    });
+  }
+
+  _swapLangs() {
+    const prevSrc = this._srcLang;
+    const prevTgt = this._tgtLang;
+    const newSrc = prevSrc === 'auto' ? (this._result?.sourceLang || prevTgt) : prevTgt;
+    const newTgt = prevSrc === 'auto' ? prevTgt : prevSrc;
+    this._srcLang = newSrc;
+    this._tgtLang = newTgt;
+    if (this._srcSelect) this._srcSelect.value = newSrc;
+    if (this._tgtSelect) this._tgtSelect.value = newTgt;
+    if (this._inputEl && this._result?.targetText) {
+      this._inputEl.value = this._result.targetText;
+    }
+    this._scheduleTranslate();
+  }
+
+  _scheduleTranslate() {
+    if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => this._doTranslate(), 600);
+  }
+
+  async _doTranslate() {
+    this._debounceTimer = null;
+    const text = this._inputEl?.value.trim();
+    if (!text) {
+      this._result = null;
+      this._renderResult();
+      return;
+    }
+    if (this._resultEl) {
+      this._resultEl.empty ? this._resultEl.empty() : (this._resultEl.textContent = '');
+      this._resultEl.createEl('span', { cls: 'mtt-trans-loading', text: '…' });
+    }
+    try {
+      const engineKey = this.plugin.settings.mouseoverEngine || 'google';
+      const eng = ENGINES[engineKey] || ENGINES.google;
+      this._result = await eng.translate(text, this._srcLang, this._tgtLang, this.plugin.settings);
+    } catch (e) {
+      this._result = { _error: e.message || String(e) };
+    }
+    this._renderResult();
+  }
+
+  _renderResult() {
+    const el = this._resultEl;
+    if (!el) return;
+    el.empty ? el.empty() : (el.textContent = '');
+    const s = i18n();
+
+    if (!this._result) {
+      this._metaEl.textContent = '';
+      this._copyBtn.style.visibility = 'hidden';
+      return;
+    }
+    if (this._result._error) {
+      el.createEl('div', { cls: 'mtt-trans-error', text: `⚠ ${this._result._error}` });
+      this._metaEl.textContent = '';
+      this._copyBtn.style.visibility = 'hidden';
+      return;
+    }
+    if (!this._result.targetText) {
+      el.createEl('div', { cls: 'mtt-trans-empty', text: s.noTranslation });
+      this._metaEl.textContent = '';
+      this._copyBtn.style.visibility = 'hidden';
       return;
     }
 
-    const { targetText, sourceLang, targetLang, dict, transliteration } = this._currentResult;
-    const sourceText = this._currentText;
-
-    // Source text row
-    const sourceWrap = el.createEl('div', { cls: 'mtt-trans-source-wrap' });
-    sourceWrap.createEl('span', { cls: 'mtt-trans-label', text: s.transPanelSource });
-    sourceWrap.createEl('span', { cls: 'mtt-trans-source-text', text: sourceText || '' });
-
-    // Main translation (dict or plain)
+    const { targetText, sourceLang, targetLang, dict, transliteration } = this._result;
     const showDict = Array.isArray(dict) && dict.length > 0;
+
     if (showDict) {
       const dictWrap = el.createEl('div', { cls: 'mtt-trans-dict' });
       for (const { pos, terms } of dict) {
@@ -1338,23 +1449,23 @@ class TranslationView extends ItemView {
         row.createEl('span', { cls: 'mtt-trans-terms', text: (terms || []).join(' / ') });
       }
     } else {
-      el.createEl('div', { cls: 'mtt-trans-target', text: targetText });
+      el.createEl('div', { cls: 'mtt-trans-target-text', text: targetText });
     }
 
     if (transliteration) {
       el.createEl('div', { cls: 'mtt-trans-translit', text: transliteration });
     }
-    if (sourceLang && targetLang) {
-      el.createEl('div', { cls: 'mtt-trans-meta', text: `${sourceLang} → ${targetLang}` });
-    }
 
-    // Copy button
-    const copyBtn = el.createEl('button', { cls: 'mtt-trans-copy', text: s.transPanelCopy });
-    copyBtn.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(targetText);
-      copyBtn.textContent = s.transPanelCopied;
-      setTimeout(() => { copyBtn.textContent = s.transPanelCopy; }, 1500);
-    });
+    this._metaEl.textContent = sourceLang && targetLang ? `${sourceLang} → ${targetLang}` : '';
+    this._copyBtn.style.visibility = '';
+  }
+
+  // Called by TooltipManager on hover translation — fills input only when empty.
+  update(text, result) {
+    if (!this._inputEl || this._inputEl.value.trim()) return;
+    this._inputEl.value = text || '';
+    this._result = result;
+    this._renderResult();
   }
 }
 
