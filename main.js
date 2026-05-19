@@ -40,6 +40,9 @@ const DEFAULT_SETTINGS = {
   // When true and page translation is showing, hover shows the pre-translation text
   // of the paragraph instead of running the normal word/sentence tooltip.
   pageTranslationHoverOriginal: true,
+  // When true, each newline-separated line in a block is translated individually.
+  // When false (default), the entire block element is translated as one unit.
+  pageTranslationSplitByLine: false,
   // LLM engine settings
   openaiCompatApiUrl: 'https://api.openai.com',
   openaiCompatApiKey: '',
@@ -165,6 +168,8 @@ const STRINGS = {
     hoverDelayDesc: 'Wait time before the tooltip is requested.',
     pageHoverOrig: 'Show original paragraph on hover during page translation',
     pageHoverOrigDesc: 'While page translation is active, disable normal hover/selection translation and show the pre-translation text of the hovered paragraph instead.',
+    pageSplitByLine: 'Translate line by line',
+    pageSplitByLineDesc: 'When enabled, each newline-separated line within a block is translated individually. When disabled (default), the entire block element is translated as one unit.',
     // Engine dropdown labels (for LLM engines)
     engOpenaiCompat: 'OpenAI Compatible API',
     engOllama: 'Ollama (local)',
@@ -270,6 +275,8 @@ const STRINGS = {
     modeReading: 'リーディングモードのみ',
     pageHoverOrig: '翻訳表示中は段落原文をホバー表示',
     pageHoverOrigDesc: 'ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。',
+    pageSplitByLine: '行ごとに翻訳',
+    pageSplitByLineDesc: '有効にすると、ブロック内の改行で区切られた各行を個別に翻訳します。無効（デフォルト）の場合は、ブロック要素全体をひとつの単位として翻訳します。',
     engOpenaiCompat: 'OpenAI互換API',
     engOllama: 'Ollama (ローカル)',
     engLmstudio: 'LM Studio (ローカル)',
@@ -1593,7 +1600,7 @@ class PageTranslator {
     this._running = true;
     this._cancelled = false;
 
-    const { pageEngine, sourceLang, targetLang, disableCache } = this.plugin.settings;
+    const { pageEngine, sourceLang, targetLang, disableCache, pageTranslationSplitByLine } = this.plugin.settings;
     const engine = pageEngine || 'google';
     const eng = ENGINES[engine] || ENGINES.google;
     const tooltip = this.plugin.tooltip;
@@ -1607,15 +1614,39 @@ class PageTranslator {
       if (!originalText) { done++; continue; }
 
       try {
-        const key = `v2|${engine}|${sourceLang}|${targetLang}|${originalText}`;
-        const cached = disableCache ? null : tooltip?.cacheGet(key);
-        const result = cached ?? await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
-        if (!cached && result?.targetText) tooltip?.cacheSet(key, result, originalText);
-        if (this._cancelled) break;
-        if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
-          el.setAttribute('data-mtt-orig', el.innerHTML);
-          el.textContent = result.targetText;
-          el.classList.add('mtt-page-translated');
+        if (pageTranslationSplitByLine) {
+          const lines = originalText.split('\n').map(l => l.trim()).filter(l => l.length >= 2);
+          if (lines.length > 0) {
+            const translatedLines = [];
+            for (const line of lines) {
+              if (this._cancelled) break;
+              const key = `v2|${engine}|${sourceLang}|${targetLang}|${line}`;
+              const cached = disableCache ? null : tooltip?.cacheGet(key);
+              const result = cached ?? await eng.translate(line, sourceLang, targetLang, this.plugin.settings);
+              if (!cached && result?.targetText) tooltip?.cacheSet(key, result, line);
+              translatedLines.push(
+                (result?.targetText && !isNoopTranslation(result, line, this.plugin.settings))
+                  ? result.targetText
+                  : line
+              );
+            }
+            if (!this._cancelled && translatedLines.some((t, i) => t !== lines[i])) {
+              el.setAttribute('data-mtt-orig', el.innerHTML);
+              el.innerHTML = translatedLines.join('<br>');
+              el.classList.add('mtt-page-translated');
+            }
+          }
+        } else {
+          const key = `v2|${engine}|${sourceLang}|${targetLang}|${originalText}`;
+          const cached = disableCache ? null : tooltip?.cacheGet(key);
+          const result = cached ?? await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
+          if (!cached && result?.targetText) tooltip?.cacheSet(key, result, originalText);
+          if (this._cancelled) break;
+          if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
+            el.setAttribute('data-mtt-orig', el.innerHTML);
+            el.textContent = result.targetText;
+            el.classList.add('mtt-page-translated');
+          }
         }
       } catch (e) {
         console.warn('[mtt] page translation error:', e);
@@ -2323,6 +2354,16 @@ class MouseTooltipSettingTab extends PluginSettingTab {
           this.plugin.settings.pageTranslationHoverOriginal = v;
           await this.plugin.saveSettings();
           this.plugin.tooltip.hide();
+        }));
+
+    new Setting(containerEl)
+      .setName(s.pageSplitByLine)
+      .setDesc(s.pageSplitByLineDesc)
+      .addToggle((t) => t
+        .setValue(this.plugin.settings.pageTranslationSplitByLine)
+        .onChange(async (v) => {
+          this.plugin.settings.pageTranslationSplitByLine = v;
+          await this.plugin.saveSettings();
         }));
 
     // ---- Tooltip Contents ----
