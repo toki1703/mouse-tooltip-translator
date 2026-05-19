@@ -1140,7 +1140,7 @@ class VocabView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this._sort = 'count-desc';
-    this._filter = 'all';
+    this._filter = 'word';
     this._listEl = null;
   }
 
