@@ -312,3 +312,110 @@
   color: var(--text-muted, #aaaaaa);
   font-size: 0.9em;
 }
+
+/* ── Translation Panel ───────────────────────────────────────── */
+.mtt-trans-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mtt-trans-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mtt-trans-waiting {
+  color: var(--text-faint);
+  font-size: 0.9em;
+  text-align: center;
+  margin-top: 40px;
+  font-style: italic;
+}
+
+.mtt-trans-source-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--background-modifier-border);
+}
+
+.mtt-trans-label {
+  color: var(--text-faint);
+  white-space: nowrap;
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.mtt-trans-source-text {
+  color: var(--text-muted);
+  font-size: 0.88em;
+  word-break: break-word;
+}
+
+.mtt-trans-target {
+  font-size: 1.15em;
+  font-weight: 600;
+  color: var(--text-normal);
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.mtt-trans-dict {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mtt-trans-dict-row {
+  font-size: 1em;
+  line-height: 1.5;
+}
+
+.mtt-trans-pos {
+  color: var(--text-accent);
+  font-weight: 600;
+}
+
+.mtt-trans-terms {
+  color: var(--text-normal);
+}
+
+.mtt-trans-translit {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+.mtt-trans-meta {
+  color: var(--text-faint);
+  font-size: 0.78em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mtt-trans-copy {
+  align-self: flex-start;
+  padding: 3px 12px;
+  font-size: 0.82em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.mtt-trans-copy:hover {
+  background: var(--interactive-hover);
+  color: var(--text-normal);
+}

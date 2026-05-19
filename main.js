@@ -183,6 +183,13 @@ const STRINGS = {
     uiLang: 'Interface language',
     uiLangDesc: 'Language used in the plugin settings UI.',
     uiLangSystem: 'Follow system',
+    // Translation panel
+    ribbonTrans: 'Open translation panel',
+    transPanelTitle: 'Translation',
+    transPanelWaiting: 'Hover over text to translate…',
+    transPanelCopy: 'Copy',
+    transPanelCopied: 'Copied!',
+    transPanelSource: 'Original:',
   },
   ja: {
     origLabel: '原文:',
@@ -292,6 +299,13 @@ const STRINGS = {
     uiLang: 'UI言語',
     uiLangDesc: 'プラグイン設定UIに使用する言語。',
     uiLangSystem: 'システムに従う',
+    // Translation panel
+    ribbonTrans: '翻訳パネルを開く',
+    transPanelTitle: '翻訳',
+    transPanelWaiting: 'テキストにホバーして翻訳…',
+    transPanelCopy: 'コピー',
+    transPanelCopied: 'コピー済み',
+    transPanelSource: '原文:',
   },
 };
 
@@ -1056,6 +1070,7 @@ class TooltipManager {
       return;
     }
     this.lastResult = result;
+    this._notifyTransView(text, result);
     el.empty ? el.empty() : (el.textContent = '');
 
     const showDict = this.plugin.settings.showDictionary
@@ -1133,6 +1148,11 @@ class TooltipManager {
     if (x < 0) x = pad;
     this.el.style.left = `${x}px`;
     this.el.style.top = `${y}px`;
+  }
+  _notifyTransView(text, result) {
+    if (!this.plugin) return;
+    this.plugin.app.workspace.getLeavesOfType(TRANS_VIEW_TYPE)
+      .forEach(l => { if (l.view?.update) l.view.update(text, result); });
   }
   async destroy() {
     this.hide();
@@ -1249,6 +1269,92 @@ class VocabView extends ItemView {
         }
       }
     }
+  }
+}
+
+// ── Translation Panel ─────────────────────────────────────────────────────────
+const TRANS_VIEW_TYPE = 'mtt-trans-view';
+
+class TranslationView extends ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.plugin = plugin;
+    this._currentText = null;
+    this._currentResult = null;
+    this._contentEl = null;
+  }
+
+  getViewType() { return TRANS_VIEW_TYPE; }
+  getDisplayText() { return i18n().transPanelTitle; }
+  getIcon() { return 'message-square'; }
+
+  async onOpen() {
+    const root = this.containerEl.children[1];
+    root.empty();
+    root.addClass('mtt-trans-root');
+    this._contentEl = root.createEl('div', { cls: 'mtt-trans-content' });
+    // Show last translation if one is already available.
+    const last = this.plugin.tooltip?.lastResult;
+    const lastText = this.plugin.tooltip?.lastText;
+    if (last && lastText) {
+      this._currentText = lastText;
+      this._currentResult = last;
+    }
+    this._renderContent();
+  }
+
+  update(text, result) {
+    this._currentText = text;
+    this._currentResult = result;
+    if (this._contentEl) this._renderContent();
+  }
+
+  _renderContent() {
+    const el = this._contentEl;
+    if (!el) return;
+    el.empty();
+    const s = i18n();
+
+    if (!this._currentResult || !this._currentResult.targetText) {
+      el.createEl('div', { cls: 'mtt-trans-waiting', text: s.transPanelWaiting });
+      return;
+    }
+
+    const { targetText, sourceLang, targetLang, dict, transliteration } = this._currentResult;
+    const sourceText = this._currentText;
+
+    // Source text row
+    const sourceWrap = el.createEl('div', { cls: 'mtt-trans-source-wrap' });
+    sourceWrap.createEl('span', { cls: 'mtt-trans-label', text: s.transPanelSource });
+    sourceWrap.createEl('span', { cls: 'mtt-trans-source-text', text: sourceText || '' });
+
+    // Main translation (dict or plain)
+    const showDict = Array.isArray(dict) && dict.length > 0;
+    if (showDict) {
+      const dictWrap = el.createEl('div', { cls: 'mtt-trans-dict' });
+      for (const { pos, terms } of dict) {
+        const row = dictWrap.createEl('div', { cls: 'mtt-trans-dict-row' });
+        if (pos) row.createEl('span', { cls: 'mtt-trans-pos', text: pos + ': ' });
+        row.createEl('span', { cls: 'mtt-trans-terms', text: (terms || []).join(' / ') });
+      }
+    } else {
+      el.createEl('div', { cls: 'mtt-trans-target', text: targetText });
+    }
+
+    if (transliteration) {
+      el.createEl('div', { cls: 'mtt-trans-translit', text: transliteration });
+    }
+    if (sourceLang && targetLang) {
+      el.createEl('div', { cls: 'mtt-trans-meta', text: `${sourceLang} → ${targetLang}` });
+    }
+
+    // Copy button
+    const copyBtn = el.createEl('button', { cls: 'mtt-trans-copy', text: s.transPanelCopy });
+    copyBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(targetText);
+      copyBtn.textContent = s.transPanelCopied;
+      setTimeout(() => { copyBtn.textContent = s.transPanelCopy; }, 1500);
+    });
   }
 }
 
@@ -1458,7 +1564,9 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     this.addSettingTab(new MouseTooltipSettingTab(this.app, this));
 
     this.registerView(VOCAB_VIEW_TYPE, (leaf) => new VocabView(leaf, this));
+    this.registerView(TRANS_VIEW_TYPE, (leaf) => new TranslationView(leaf, this));
 
+    this.addRibbonIcon('message-square', i18n().ribbonTrans, () => this.openTransView());
     this.addRibbonIcon('book-open', i18n().ribbonVocab, () => this.openVocabView());
     this.ribbonPageEl = this.addRibbonIcon('languages', i18n().ribbonPage, () => {
       if (this.pageTranslator._running) {
@@ -1471,6 +1579,11 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     });
     if (!(Platform.isMobile ? this.settings.enablePageMobile : this.settings.enablePage)) this.ribbonPageEl.style.display = 'none';
 
+    this.addCommand({
+      id: 'mtt-open-trans-panel',
+      name: 'Open translation panel',
+      callback: () => this.openTransView(),
+    });
     this.addCommand({
       id: 'mtt-open-vocab',
       name: 'Open vocabulary list',
@@ -1569,6 +1682,7 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     if (this.pageTranslator?._running) this.pageTranslator.cancel();
     if (this.tooltip) await this.tooltip.destroy();
     this.app.workspace.detachLeavesOfType(VOCAB_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(TRANS_VIEW_TYPE);
   }
 
   _addPageTranslateButton(view) {
@@ -1586,6 +1700,19 @@ module.exports = class MouseTooltipPlugin extends Plugin {
     });
     btn.classList.add('mtt-page-btn');
     this.pageTranslator._syncButton(view);
+  }
+
+  async openTransView() {
+    const existing = this.app.workspace.getLeavesOfType(TRANS_VIEW_TYPE);
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (leaf) {
+      await leaf.setViewState({ type: TRANS_VIEW_TYPE, active: true });
+      this.app.workspace.revealLeaf(leaf);
+    }
   }
 
   async openVocabView() {
