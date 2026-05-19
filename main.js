@@ -168,8 +168,8 @@ const STRINGS = {
     hoverDelayDesc: 'Wait time before the tooltip is requested.',
     pageHoverOrig: 'Show original paragraph on hover during page translation',
     pageHoverOrigDesc: 'While page translation is active, disable normal hover/selection translation and show the pre-translation text of the hovered paragraph instead.',
-    pageSplitByLine: 'Translate line by line',
-    pageSplitByLineDesc: 'When enabled, each newline-separated line within a block is translated individually. When disabled (default), the entire block element is translated as one unit.',
+    pageSplitByLine: 'Translate by markdown source line',
+    pageSplitByLineDesc: 'When enabled, the active note\'s markdown source is read and each line is translated individually (so a multi-line paragraph becomes multiple translation calls). When disabled (default), each rendered block element (paragraph / list item / heading) is translated as one unit.',
     // Engine dropdown labels (for LLM engines)
     engOpenaiCompat: 'OpenAI Compatible API',
     engOllama: 'Ollama (local)',
@@ -275,8 +275,8 @@ const STRINGS = {
     modeReading: 'リーディングモードのみ',
     pageHoverOrig: '翻訳表示中は段落原文をホバー表示',
     pageHoverOrigDesc: 'ページ翻訳の結果を表示しているとき、通常のホバー翻訳・テキスト選択翻訳を無効にし、ホバーした段落の翻訳前テキストをツールチップに表示します。',
-    pageSplitByLine: '行ごとに翻訳',
-    pageSplitByLineDesc: '有効にすると、ブロック内の改行で区切られた各行を個別に翻訳します。無効（デフォルト）の場合は、ブロック要素全体をひとつの単位として翻訳します。',
+    pageSplitByLine: 'Markdownソースの行ごとに翻訳',
+    pageSplitByLineDesc: '有効にすると、開いているノートのMarkdownソースを読み込み、ソース上の各行を個別に翻訳します（複数行からなる段落も行ごとに分割）。無効（デフォルト）の場合は、レンダリングされたブロック要素（段落・リスト項目・見出し）全体をひとつの単位として翻訳します。',
     engOpenaiCompat: 'OpenAI互換API',
     engOllama: 'Ollama (ローカル)',
     engLmstudio: 'LM Studio (ローカル)',
@@ -1507,6 +1507,59 @@ class PageTranslator {
     btn.classList.toggle('is-active', active);
   }
 
+  // Normalize text for matching DOM block textContent against source markdown lines.
+  // Strips common markdown markers and collapses whitespace.
+  _normalizeForMatch(s) {
+    return s
+      .replace(/^\s*[>\-*+]\s+/, '')                  // list / quote markers
+      .replace(/^\s*\d+\.\s+/, '')                    // ordered list
+      .replace(/^\s*#+\s*/, '')                       // heading
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')       // images
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')        // links
+      .replace(/\*\*([^*]+)\*\*/g, '$1')              // bold
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1')     // italic
+      .replace(/(?<!_)_([^_]+)_(?!_)/g, '$1')
+      .replace(/~~([^~]+)~~/g, '$1')                  // strikethrough
+      .replace(/`([^`]+)`/g, '$1')                    // inline code
+      .replace(/==([^=]+)==/g, '$1')                  // highlight
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Given a DOM block's text and the full list of source markdown lines, find
+  // a contiguous slice of non-blank source lines whose joined (with single
+  // space) normalized text matches the block. Returns { lines, nextIndex } or
+  // null if no match was found.
+  _findSourceLines(blockText, sourceLines, fromIndex) {
+    const target = this._normalizeForMatch(blockText).replace(/\s+/g, ' ');
+    if (!target) return null;
+    const compact = (s) => s.replace(/\s+/g, '');
+    const targetCompact = compact(target);
+
+    for (let start = fromIndex; start < sourceLines.length; start++) {
+      if (!this._normalizeForMatch(sourceLines[start])) continue;
+
+      let joined = '';
+      const matched = [];
+      for (let end = start; end < sourceLines.length; end++) {
+        const norm = this._normalizeForMatch(sourceLines[end]);
+        if (!norm) {
+          if (matched.length > 0) break;
+          continue;
+        }
+        matched.push(sourceLines[end]);
+        joined = joined ? joined + ' ' + norm : norm;
+
+        if (joined === target || compact(joined) === targetCompact) {
+          return { lines: matched, nextIndex: end + 1 };
+        }
+        if (compact(joined).length > targetCompact.length + 8) break;
+      }
+    }
+    return null;
+  }
+
   // Returns leaf-level translatable block elements (headings, paragraphs, list
   // items, table cells, etc.) that haven't been translated yet.
   _getBlocks(container) {
@@ -1605,6 +1658,30 @@ class PageTranslator {
     const eng = ENGINES[engine] || ENGINES.google;
     const tooltip = this.plugin.tooltip;
 
+    // For markdown-source line-by-line mode, read the active note's source and split.
+    let sourceLines = null;
+    let sourceIndex = 0;
+    if (pageTranslationSplitByLine) {
+      try {
+        const file = this.plugin.app.workspace.getActiveFile();
+        if (file) {
+          const content = await this.plugin.app.vault.cachedRead(file);
+          sourceLines = content.split('\n');
+        }
+      } catch (e) {
+        console.warn('[mtt] Failed to read source markdown:', e);
+      }
+    }
+
+    const translateOne = async (text) => {
+      const key = `v2|${engine}|${sourceLang}|${targetLang}|${text}`;
+      const cached = disableCache ? null : tooltip?.cacheGet(key);
+      const result = cached ?? await eng.translate(text, sourceLang, targetLang, this.plugin.settings);
+      if (!cached && result?.targetText) tooltip?.cacheSet(key, result, text);
+      return (result?.targetText && !isNoopTranslation(result, text, this.plugin.settings))
+        ? result.targetText : null;
+    };
+
     this._showProgress(0, blocks.length);
     let done = 0;
 
@@ -1614,37 +1691,34 @@ class PageTranslator {
       if (!originalText) { done++; continue; }
 
       try {
-        if (pageTranslationSplitByLine) {
-          const lines = originalText.split('\n').map(l => l.trim()).filter(l => l.length >= 2);
-          if (lines.length > 0) {
-            const translatedLines = [];
-            for (const line of lines) {
-              if (this._cancelled) break;
-              const key = `v2|${engine}|${sourceLang}|${targetLang}|${line}`;
-              const cached = disableCache ? null : tooltip?.cacheGet(key);
-              const result = cached ?? await eng.translate(line, sourceLang, targetLang, this.plugin.settings);
-              if (!cached && result?.targetText) tooltip?.cacheSet(key, result, line);
-              translatedLines.push(
-                (result?.targetText && !isNoopTranslation(result, line, this.plugin.settings))
-                  ? result.targetText
-                  : line
-              );
-            }
-            if (!this._cancelled && translatedLines.some((t, i) => t !== lines[i])) {
-              el.setAttribute('data-mtt-orig', el.innerHTML);
-              el.innerHTML = translatedLines.join('<br>');
-              el.classList.add('mtt-page-translated');
-            }
+        let sourceMatch = null;
+        if (pageTranslationSplitByLine && sourceLines) {
+          sourceMatch = this._findSourceLines(originalText, sourceLines, sourceIndex);
+          if (sourceMatch) sourceIndex = sourceMatch.nextIndex;
+        }
+
+        if (sourceMatch && sourceMatch.lines.length > 1) {
+          // Multi-line markdown source block: translate each source line individually.
+          const translatedLines = [];
+          for (const rawLine of sourceMatch.lines) {
+            if (this._cancelled) break;
+            const lineText = this._normalizeForMatch(rawLine);
+            if (!lineText) continue;
+            const translated = await translateOne(lineText);
+            translatedLines.push(translated ?? lineText);
+          }
+          if (!this._cancelled && translatedLines.length > 0) {
+            el.setAttribute('data-mtt-orig', el.innerHTML);
+            el.innerHTML = translatedLines.map(l => l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br>');
+            el.classList.add('mtt-page-translated');
           }
         } else {
-          const key = `v2|${engine}|${sourceLang}|${targetLang}|${originalText}`;
-          const cached = disableCache ? null : tooltip?.cacheGet(key);
-          const result = cached ?? await eng.translate(originalText, sourceLang, targetLang, this.plugin.settings);
-          if (!cached && result?.targetText) tooltip?.cacheSet(key, result, originalText);
+          // Block mode (or 行ごと mode with only one source line for this block).
+          const translated = await translateOne(originalText);
           if (this._cancelled) break;
-          if (result?.targetText && !isNoopTranslation(result, originalText, this.plugin.settings)) {
+          if (translated) {
             el.setAttribute('data-mtt-orig', el.innerHTML);
-            el.textContent = result.targetText;
+            el.textContent = translated;
             el.classList.add('mtt-page-translated');
           }
         }
