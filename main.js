@@ -72,6 +72,8 @@ const STRINGS = {
     filterWord: 'Word',
     filterSentence: 'Sentence',
     vocabEmpty: 'No translation history',
+    vocabCopy: 'Copy',
+    vocabCopied: 'Copied!',
     // Page translator
     pageAlreadyRunning: 'Page translation is already running.',
     pageNeedReadingView: 'Please switch to Reading View to translate the page.',
@@ -191,6 +193,9 @@ const STRINGS = {
     filterWord: '単語',
     filterSentence: '文',
     vocabEmpty: '翻訳履歴がありません',
+    vocabCopy: 'コピー',
+    vocabCopied: 'コピー済み',
+    // Page translator
     pageAlreadyRunning: 'ページ翻訳は既に実行中です。',
     pageNeedReadingView: 'ページ翻訳には閲覧モード（Reading View）に切り替えてください。',
     pageNoText: '翻訳するテキストが見つかりませんでした。',
@@ -1219,6 +1224,12 @@ class VocabView extends ItemView {
       main.createEl('span', { cls: 'mtt-vocab-sep', text: ' → ' });
       main.createEl('span', { cls: 'mtt-vocab-target', text: entry.targetText });
       main.createEl('span', { cls: 'mtt-vocab-count', text: `×${entry.count}` });
+      const copyBtn = main.createEl('button', { cls: 'mtt-vocab-copy', text: i18n().vocabCopy });
+      copyBtn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(`${entry.sourceText} → ${entry.targetText}`);
+        copyBtn.textContent = i18n().vocabCopied;
+        setTimeout(() => { copyBtn.textContent = i18n().vocabCopy; }, 1500);
+      });
 
       if (Array.isArray(entry.pos) && entry.pos.length > 0) {
         const posWrap = card.createEl('div', { cls: 'mtt-vocab-pos-wrap' });
