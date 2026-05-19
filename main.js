@@ -74,6 +74,9 @@ const STRINGS = {
     vocabEmpty: 'No translation history',
     vocabCopy: 'Copy',
     vocabCopied: 'Copied!',
+    copyTranslation: 'Copy translation',
+    copyTranslationNotice: (text) => `Copied: ${text}`,
+    copyTranslationNone: 'No translation to copy.',
     // Page translator
     pageAlreadyRunning: 'Page translation is already running.',
     pageNeedReadingView: 'Please switch to Reading View to translate the page.',
@@ -195,6 +198,9 @@ const STRINGS = {
     vocabEmpty: '翻訳履歴がありません',
     vocabCopy: 'コピー',
     vocabCopied: 'コピー済み',
+    copyTranslation: '翻訳をコピー',
+    copyTranslationNotice: (text) => `コピーしました: ${text}`,
+    copyTranslationNone: 'コピーできる翻訳がありません。',
     // Page translator
     pageAlreadyRunning: 'ページ翻訳は既に実行中です。',
     pageNeedReadingView: 'ページ翻訳には閲覧モード（Reading View）に切り替えてください。',
@@ -932,6 +938,7 @@ class TooltipManager {
     this.el = null;
     this.token = 0;
     this.lastText = '';
+    this.lastResult = null;
     this.cache = new Map();
     this.maxCache = 1000;
   }
@@ -946,6 +953,7 @@ class TooltipManager {
   }
   hide() {
     this.lastText = '';
+    this.lastResult = null;
     this.token++;
     if (this.el) this.el.style.display = 'none';
   }
@@ -1047,6 +1055,7 @@ class TooltipManager {
       this.hide();
       return;
     }
+    this.lastResult = result;
     el.empty ? el.empty() : (el.textContent = '');
 
     const showDict = this.plugin.settings.showDictionary
@@ -1496,6 +1505,20 @@ module.exports = class MouseTooltipPlugin extends Plugin {
       id: 'mtt-restore-page',
       name: 'Restore original text (page translation)',
       callback: () => this.pageTranslator.restorePage(),
+    });
+    this.addCommand({
+      id: 'mtt-copy-translation',
+      name: 'Copy translation to clipboard',
+      callback: async () => {
+        const result = this.tooltip.lastResult;
+        const s = i18n();
+        if (!result || !result.targetText) {
+          new Notice(s.copyTranslationNone);
+          return;
+        }
+        await navigator.clipboard.writeText(result.targetText);
+        new Notice(s.copyTranslationNotice(result.targetText));
+      },
     });
 
     // Add translate button to all current and future markdown view headers.
