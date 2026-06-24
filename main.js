@@ -411,6 +411,16 @@ async function http(method, url, { headers, body, searchParams } = {}) {
   return res;
 }
 async function httpGetText(url, opts) { return (await http('GET', url, opts)).text; }
+// Extract "name=value" cookie pairs from a Set-Cookie response header.
+// Obsidian's requestUrl may expose it as an array (one entry per cookie) or as a
+// single comma-joined string; handle both, avoiding the comma inside Expires=...GMT.
+function parseSetCookie(setCookie) {
+  if (!setCookie) return '';
+  const list = Array.isArray(setCookie)
+    ? setCookie
+    : String(setCookie).split(/,(?=\s*[A-Za-z0-9!#$%&'*+\-.^_`|~]+=)/);
+  return list.map((c) => c.split(';')[0].trim()).filter(Boolean).join('; ');
+}
 async function httpJson(method, url, opts) {
   const res = await http(method, url, opts);
   try { return res.json; } catch { return JSON.parse(res.text); }
@@ -559,35 +569,62 @@ class BingEngine extends BaseTranslator {
     uk: 'uk', ur: 'ur', vi: 'vi', 'zh-CN': 'zh-Hans', 'zh-TW': 'zh-Hant',
   };
   static tokenUrl = 'https://www.bing.com/translator';
+  static chinaTokenUrl = 'https://cn.bing.com/translator';
   static baseUrl = 'https://www.bing.com/ttranslatev3';
+  static chinaBaseUrl = 'https://cn.bing.com/ttranslatev3';
   static accessToken = null;
+  static useChina = false;
 
-  static async getAccessToken() {
-    if (this.accessToken && Date.now() - this.accessToken.tokenTs < this.accessToken.expiryInterval) {
-      return this.accessToken;
-    }
-    const html = await httpGetText(this.tokenUrl);
+  static get userAgent() {
+    return (typeof navigator !== 'undefined' && navigator.userAgent) || 'Mozilla/5.0';
+  }
+
+  static async fetchToken(tokenUrl) {
+    const res = await http('GET', tokenUrl, { headers: { 'User-Agent': this.userAgent } });
+    const html = res.text;
+    const cookie = parseSetCookie(
+      res.headers && (res.headers['set-cookie'] || res.headers['Set-Cookie'])
+    );
     const IG = (html.match(/IG:"([^"]+)"/) || [])[1];
     const IID = (html.match(/data-iid="([^"]+)"/) || [])[1];
     const m = html.match(/params_AbusePreventionHelper\s?=\s?(\[[^\]]+\])/);
     if (!IG || !m) throw new Error('Bing token parse failed');
     // params_AbusePreventionHelper = [key, token, expiryInterval]
     const [key, token, expiryInterval] = JSON.parse(m[1]);
-    this.accessToken = { IG, IID, key, token, tokenTs: Date.now(), expiryInterval, count: 0 };
-    return this.accessToken;
+    return { IG, IID, key, token, tokenTs: Date.now(), expiryInterval, count: 0, cookie };
+  }
+
+  static async getAccessToken() {
+    if (this.accessToken && Date.now() - this.accessToken.tokenTs <= this.accessToken.expiryInterval) {
+      return this.accessToken;
+    }
+    // Try the global endpoint first, then fall back to the China endpoint.
+    let lastErr;
+    for (const china of [false, true]) {
+      try {
+        this.accessToken = await this.fetchToken(china ? this.chinaTokenUrl : this.tokenUrl);
+        this.useChina = china;
+        return this.accessToken;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('Bing token fetch failed');
   }
 
   static async requestTranslate(text, src, tgt) {
     const tk = await this.getAccessToken();
     const body = new URLSearchParams({ text, fromLang: src, to: tgt, token: tk.token, key: String(tk.key) });
-    return await httpJson('POST', this.baseUrl, {
+    return await httpJson('POST', this.useChina ? this.chinaBaseUrl : this.baseUrl, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: this.tokenUrl,
+        'User-Agent': this.userAgent,
+        Referer: this.useChina ? this.chinaTokenUrl : this.tokenUrl,
+        ...(tk.cookie ? { Cookie: tk.cookie } : {}),
       },
       searchParams: {
         IG: tk.IG,
-        IID: tk.IID ? `${tk.IID}.${tk.count++}` : '',
+        IID: tk.IID && tk.IID.length ? `${tk.IID}.${tk.count++}` : '',
         isVertical: '1',
       },
       body,
